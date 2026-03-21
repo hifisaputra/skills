@@ -106,18 +106,26 @@ gh pr create --draft --title "<issue title>" --body "Closes #<number>
 
 ```
 gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-done"
-gh issue comment <number> --body "Draft PR opened: <pr-url>"
+gh issue comment <number> --body "PR opened: <pr-url>"
 ```
 
-### 9. Next issue
+### 9. Mark PR ready for review
 
-Ask the user: "Finished #<number>. Want me to continue to the next issue?"
+Convert the draft PR to ready for review:
 
-If yes, go back to step 1.
+```
+gh pr ready <number>
+```
+
+### 10. Next issue
+
+Report: "Finished #<number>. Moving to the next issue."
+
+Go back to step 1. If no eligible issues remain, stop.
 
 ## Safety Rails
 
-- Only open **draft** PRs - never regular PRs, never merge
+- Open PRs as drafts first, then mark ready for review when done - never merge
 - If an issue seems too large (>500 lines of changes), stop and tell the user
 - If tests in the repo are failing before you start, stop and tell the user
 - If you encounter a conflict with another branch, stop and tell the user
