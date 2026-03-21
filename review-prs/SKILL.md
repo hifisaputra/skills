@@ -7,6 +7,20 @@ description: Poll for open PRs ready for review and post AI code reviews. Use wi
 
 Find open PRs that are ready for review and post AI code reviews.
 
+## Worktree Isolation
+
+This skill MUST run in its own git worktree to avoid conflicts with other parallel Claude instances (e.g. work-issues, handle-pr-feedback).
+
+Before starting, set up a worktree if not already in one:
+
+```
+# From the main repo clone
+git worktree add ../$(basename "$PWD")-reviews main
+cd ../$(basename "$PWD")-reviews
+```
+
+If already running inside a worktree, skip this step. Note: review-prs is read-only (no commits/pushes), so worktree isolation is less critical but still recommended for consistency.
+
 ## Process
 
 ### 1. Find PRs needing review

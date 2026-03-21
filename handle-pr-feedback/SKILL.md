@@ -7,6 +7,20 @@ description: Read PR review comments and push fixes in response. Use when user s
 
 Read review comments on a draft PR and push fixes.
 
+## Worktree Isolation
+
+This skill MUST run in its own git worktree to avoid conflicts with other parallel Claude instances (e.g. work-issues, review-prs).
+
+Before starting, set up a worktree if not already in one:
+
+```
+# From the main repo clone
+git worktree add ../$(basename "$PWD")-feedback main
+cd ../$(basename "$PWD")-feedback
+```
+
+If already running inside a worktree, skip this step.
+
 ## Process
 
 ### 1. Get the PR

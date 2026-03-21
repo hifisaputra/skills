@@ -7,6 +7,20 @@ description: Automatically pick up ai-ready GitHub issues, implement them using 
 
 Pick up `ai-ready` GitHub issues and implement them autonomously, one at a time.
 
+## Worktree Isolation
+
+This skill MUST run in its own git worktree to avoid conflicts with other parallel Claude instances (e.g. handle-pr-feedback, review-prs).
+
+Before starting, set up a worktree if not already in one:
+
+```
+# From the main repo clone
+git worktree add ../$(basename "$PWD")-issues main
+cd ../$(basename "$PWD")-issues
+```
+
+If already running inside a worktree, skip this step.
+
 ## Process
 
 ### 1. Find the next issue
