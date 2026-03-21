@@ -33,13 +33,19 @@ Filter to PRs that are:
 - NOT drafts
 - Do NOT already have a review comment containing `<!-- ai-review -->`
 
-To check for existing AI review, for each candidate PR:
+To check review status, for each candidate PR:
 
 ```
 gh pr view <number> --comments --json comments
 ```
 
-Skip any PR where a comment body contains `<!-- ai-review -->`.
+Look at comments containing `<!-- ai-review -->` and `<!-- feedback-addressed -->`:
+
+- If no `<!-- ai-review -->` comment exists → **needs review**
+- If `<!-- ai-review -->` exists but no `<!-- feedback-addressed -->` after it → **already reviewed, skip**
+- If `<!-- feedback-addressed -->` exists and is MORE RECENT than the last `<!-- ai-review -->` → **needs re-review**
+
+Compare by comment order (later in the list = more recent).
 
 If no PRs need review, say "No PRs to review" and stop.
 

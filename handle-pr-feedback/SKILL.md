@@ -77,13 +77,17 @@ git push
 Reply on the PR summarizing what was addressed:
 
 ```
-gh pr comment <number> --body "Addressed review feedback:
+gh pr comment <number> --body "$(cat <<'EOF'
+<!-- feedback-addressed -->
+Addressed review feedback:
 - <fix 1>
 - <fix 2>
 - Replied to questions about <topic>
 - Applied nits: <list>
 
-Ready for another look."
+Ready for another look.
+EOF
+)"
 ```
 
 ### 6. Report
