@@ -43,6 +43,20 @@ Grep results can flood context. Use `ctx_execute(language: "shell", code: "grep 
 4. **WEB**: `ctx_fetch_and_index(url, source)` then `ctx_search(queries)` — Fetch, chunk, index, query. Raw HTML never enters context.
 5. **INDEX**: `ctx_index(content, source)` — Store content in FTS5 knowledge base for later search.
 
+## Documentation-first implementation — MANDATORY
+
+Before implementing or modifying code that uses any library, framework, or API, you MUST look up the latest documentation first. Do NOT rely on training data — it may be outdated.
+
+1. **context7** (preferred): Use `resolve-library-id` to find the library, then `query-docs` to fetch current docs for the specific feature you need.
+2. **WebSearch** fallback: If context7 doesn't cover the library, use `WebSearch` to find the official docs, then `ctx_fetch_and_index` to ingest them.
+
+This applies whenever you are:
+- Using an API, SDK, or library you haven't already looked up in this session
+- Generating code that depends on specific method signatures, options, or behavior
+- Unsure whether a feature exists or what the current syntax is
+
+Skip the lookup ONLY if the user explicitly says to, or if you already retrieved docs for that library earlier in the same session.
+
 ## Subagent routing
 
 When spawning subagents (Agent/Task tool), the routing block is automatically injected into their prompt. Bash-type subagents are upgraded to general-purpose so they have access to MCP tools. You do NOT need to manually instruct subagents about context-mode.
