@@ -71,7 +71,7 @@ If `gh auth status` fails, stop: "GitHub CLI is not authenticated. Run `gh auth 
 Ensure required labels exist:
 
 ```
-for label in ai-ready ai-in-progress ai-done ai-blocked ai-needs-input ai-pause needs-ai-review ai-changes-requested ai-approved prd; do
+for label in ai-ready ai-in-progress ai-done ai-blocked ai-needs-input needs-ai-review ai-changes-requested ai-approved prd; do
   gh label create "$label" --force 2>/dev/null || true
 done
 ```
@@ -139,7 +139,7 @@ gh pr list --state open --json number,title,url,isDraft,author,labels --limit 50
 Filter to non-draft PRs without an `ai-changes-requested`, `needs-ai-review`, or `ai-approved` label. Take the first 15 after filtering, then for each, read comments:
 
 ```
-gh pr view <number> --comments --json comments
+gh pr view <number> --json comments
 ```
 
 A PR needs review if:

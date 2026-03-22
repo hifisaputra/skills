@@ -69,7 +69,7 @@ If `gh auth status` fails, stop: "GitHub CLI is not authenticated. Run `gh auth 
 Ensure required labels exist (run once per cycle — `gh label create` is a no-op if the label already exists):
 
 ```
-for label in ai-ready ai-in-progress ai-done ai-blocked ai-needs-input ai-pause needs-ai-review ai-changes-requested ai-approved prd; do
+for label in ai-ready ai-in-progress ai-done ai-blocked ai-needs-input needs-ai-review ai-changes-requested ai-approved prd; do
   gh label create "$label" --force 2>/dev/null || true
 done
 ```
@@ -421,7 +421,7 @@ gh issue comment <number> --body "**[AI]** PR opened: <pr-url>"
 Check if the repo has CI checks configured:
 
 ```
-gh pr checks <pr-number> --json name,state,status
+gh pr checks <pr-number> --json name,state,bucket
 ```
 
 If no checks are configured, skip straight to marking the PR ready for review.
@@ -429,7 +429,7 @@ If no checks are configured, skip straight to marking the PR ready for review.
 If checks are running, check once after a short wait (10-15 seconds), then check once more. Don't poll in a tight loop — if checks aren't done after 2 checks, move on. The PR stays as a draft and CI status will be picked up in a later cycle.
 
 ```
-gh pr checks <pr-number> --json name,state,conclusion
+gh pr checks <pr-number> --json name,state,bucket
 ```
 
 If checks pass, proceed to B8.

@@ -10,7 +10,6 @@ labels=(
   "ai-in-progress|FBCA04|AI is currently working on this"
   "ai-done|0E8A16|AI opened a draft PR"
   "ai-blocked|D93F0B|AI asked a question, waiting for answer"
-  "ai-pause|BFD4F2|Pause AI loops gracefully"
   "needs-ai-review|7057FF|PR is ready for AI review"
   "ai-changes-requested|D93F0B|AI reviewed PR and requested changes"
   "ai-approved|0E8A16|AI reviewed PR and approved"
