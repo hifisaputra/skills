@@ -7,6 +7,12 @@ description: Autonomous loop that implements ai-ready GitHub issues, handles PR 
 
 Autonomous loop that picks up `ai-ready` issues, implements them, and handles feedback on open PRs.
 
+## Comment Authorship
+
+All comments posted by this workflow run under the same GitHub account as the user. To distinguish AI comments from human comments, **every comment posted by AI MUST start with `**[AI]**`**. When reading comments, use this rule:
+- Starts with `**[AI]**` → posted by AI (previous runs)
+- Does NOT start with `**[AI]**` → posted by a human
+
 ## Worktree Isolation
 
 This skill MUST run in its own git worktree to avoid conflicts with other parallel Claude instances.
@@ -90,7 +96,7 @@ gh pr view <number> --comments
 gh api repos/{owner}/{repo}/pulls/<number>/comments
 ```
 
-Read the actual comment contents and determine if there is unaddressed feedback — look for review comments requesting changes, questions from reviewers, or suggestions that haven't been acted on yet.
+Read the actual comment contents and determine if there is unaddressed human feedback. Human comments are those that do NOT start with `**[AI]**` — look for review comments requesting changes, questions from reviewers, or suggestions that haven't been acted on yet.
 
 If no PRs need attention, skip to Phase B.
 
@@ -125,7 +131,7 @@ Post a summary and update labels:
 
 ```
 gh pr comment <number> --body "$(cat <<'EOF'
-Addressed review feedback:
+**[AI]** Addressed review feedback:
 - <what was fixed>
 
 Ready for another look.
@@ -165,7 +171,7 @@ gh pr list --head "issue-<number>-*" --json number,state
 
 ```
 gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-ready"
-gh issue comment <number> --body "Resetting to ai-ready — previous work session was interrupted before any progress was made."
+gh issue comment <number> --body "**[AI]** Resetting to ai-ready — previous work session was interrupted before any progress was made."
 ```
 
 ### B1. Find the next issue
@@ -180,7 +186,7 @@ Also check for previously blocked issues that now have answers:
 gh issue list --label "ai-blocked" --state open --json number,title,body,labels
 ```
 
-For `ai-blocked` issues, read the comments to see if a human has replied to the AI's question. If yes, treat it as eligible again.
+For `ai-blocked` issues, read the comments to see if a human has replied to the AI's question. Human comments are those that do NOT start with `**[AI]**`. If a human comment exists after the last AI question, treat the issue as eligible again.
 
 Selection order:
 1. Unblocked `ai-blocked` issues with answered questions (priority first, then oldest)
@@ -195,7 +201,7 @@ If no issues are eligible, report "No issues to work on" and stop.
 
 ```
 gh issue edit <number> --remove-label "ai-ready" --add-label "ai-in-progress"
-gh issue comment <number> --body "Starting work on this issue."
+gh issue comment <number> --body "**[AI]** Starting work on this issue."
 git checkout -b issue-<number>-<short-slug>
 ```
 
@@ -203,7 +209,7 @@ For previously `ai-blocked` issues:
 
 ```
 gh issue edit <number> --remove-label "ai-blocked" --add-label "ai-in-progress"
-gh issue comment <number> --body "Question answered. Resuming work."
+gh issue comment <number> --body "**[AI]** Question answered. Resuming work."
 ```
 
 ### B3. Understand the issue
@@ -216,7 +222,7 @@ Read the issue body. If it references a parent PRD, read that too. Explore relev
 
 ```
 gh issue comment <number> --body "$(cat <<'EOF'
-I have a question before I can proceed:
+**[AI]** I have a question before I can proceed:
 
 <specific question about what's unclear>
 
@@ -238,7 +244,7 @@ gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-blocked"
 Before planning, estimate how many lines of code this will likely require. If the estimate is >500 lines of changes:
 
 ```
-gh issue comment <number> --body "This issue looks too large for autonomous implementation (~<estimate> lines). Consider breaking it into smaller issues."
+gh issue comment <number> --body "**[AI]** This issue looks too large for autonomous implementation (~<estimate> lines). Consider breaking it into smaller issues."
 gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-blocked"
 ```
 
@@ -246,7 +252,7 @@ Move to the next issue.
 
 ### B5. Plan
 
-Post a brief plan as a comment on the issue:
+Post a brief plan as an `**[AI]**`-prefixed comment on the issue:
 - What you'll change
 - Which behaviors you'll test
 - Your TDD cycle order (RED-GREEN pairs)
@@ -308,7 +314,7 @@ EOF
 
 ```
 gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-done"
-gh issue comment <number> --body "PR opened: <pr-url>"
+gh issue comment <number> --body "**[AI]** PR opened: <pr-url>"
 ```
 
 ### B10. Wait for CI

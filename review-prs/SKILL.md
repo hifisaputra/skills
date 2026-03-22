@@ -7,6 +7,12 @@ description: Autonomous loop that reviews PRs ready for review and re-reviews PR
 
 Autonomous loop that finds PRs ready for review and re-reviews PRs where feedback has been addressed.
 
+## Comment Authorship
+
+All comments posted by this workflow run under the same GitHub account as the user. To distinguish AI comments from human comments, **every comment posted by AI MUST start with `**[AI]**`**. When reading comments, use this rule:
+- Starts with `**[AI]**` → posted by AI (previous runs)
+- Does NOT start with `**[AI]**` → posted by a human
+
 ## Worktree Isolation
 
 This skill MUST run in its own git worktree to avoid conflicts with other parallel Claude instances.
@@ -90,9 +96,9 @@ For each non-draft PR without an `ai-changes-requested`, `needs-ai-review`, or `
 gh pr view <number> --comments --json comments
 ```
 
-Read the actual comment contents and determine if the PR needs review. A PR needs review if:
-- It has no review comments at all (needs first review)
-- It has review feedback that was addressed (author pushed fixes or replied) but no subsequent review (needs re-review)
+Read the actual comment contents and determine if the PR needs review. Comments starting with `**[AI]**` are from previous AI runs; all others are from humans. A PR needs review if:
+- It has no AI review comments at all (needs first review)
+- It has AI review feedback that was addressed (human pushed fixes or replied without `**[AI]**` prefix) but no subsequent AI review (needs re-review)
 
 Skip PRs where the last review had no requested changes and no new commits were pushed since.
 
@@ -110,8 +116,8 @@ Read the PR comments to check if you've already posted a review on this PR:
 gh pr view <number> --comments
 ```
 
-- If no previous AI review comment exists → **first review**
-- If a previous AI review exists → **re-review** (feedback was addressed and the PR was relabeled `needs-ai-review`)
+- If no comments starting with `**[AI]**` exist → **first review**
+- If a previous `**[AI]**` review comment exists → **re-review** (feedback was addressed and the PR was relabeled `needs-ai-review`)
 
 #### b. Get the diff
 
@@ -165,7 +171,7 @@ If there are issues to flag:
 gh api repos/{owner}/{repo}/pulls/<number>/reviews \
   --method POST \
   -f body="$(cat <<'EOF'
-## AI Code Review
+**[AI]** ## AI Code Review
 
 <summary of findings>
 
@@ -187,7 +193,7 @@ If changes look good with no significant issues:
 
 ```
 gh pr comment <number> --body "$(cat <<'EOF'
-## AI Code Review
+**[AI]** ## AI Code Review
 
 Changes look good. No significant issues found.
 
@@ -207,7 +213,7 @@ For re-reviews where all feedback was properly addressed:
 
 ```
 gh pr comment <number> --body "$(cat <<'EOF'
-## AI Re-Review
+**[AI]** ## AI Re-Review
 
 All previous feedback has been addressed. Changes look good.
 
