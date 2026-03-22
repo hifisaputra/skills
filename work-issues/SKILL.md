@@ -125,7 +125,6 @@ Post a summary and update labels:
 
 ```
 gh pr comment <number> --body "$(cat <<'EOF'
-<!-- feedback-addressed -->
 Addressed review feedback:
 - <what was fixed>
 
@@ -217,7 +216,6 @@ Read the issue body. If it references a parent PRD, read that too. Explore relev
 
 ```
 gh issue comment <number> --body "$(cat <<'EOF'
-<!-- ai-question -->
 I have a question before I can proceed:
 
 <specific question about what's unclear>

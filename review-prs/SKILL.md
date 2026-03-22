@@ -116,7 +116,7 @@ For re-reviews, focus on what changed since the last review:
 gh pr view <number> --json commits
 ```
 
-Check commits after the last `<!-- ai-review -->` comment. Get the diff for just those changes if possible, otherwise review the full diff.
+Check commits after the last AI review comment. Get the diff for just those changes if possible, otherwise review the full diff.
 
 #### b. Get PR context
 
@@ -160,7 +160,6 @@ If there are issues to flag:
 gh api repos/{owner}/{repo}/pulls/<number>/reviews \
   --method POST \
   -f body="$(cat <<'EOF'
-<!-- ai-review -->
 ## AI Code Review
 
 <summary of findings>
@@ -183,7 +182,6 @@ If changes look good with no significant issues:
 
 ```
 gh pr comment <number> --body "$(cat <<'EOF'
-<!-- ai-review -->
 ## AI Code Review
 
 Changes look good. No significant issues found.
@@ -204,7 +202,6 @@ For re-reviews where all feedback was properly addressed:
 
 ```
 gh pr comment <number> --body "$(cat <<'EOF'
-<!-- ai-review -->
 ## AI Re-Review
 
 All previous feedback has been addressed. Changes look good.
