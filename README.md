@@ -86,7 +86,7 @@ needs-ai-review  ->  ai-changes-requested  ->  needs-ai-review (after fixes)
        +---------------> ai-approved <----------------+
 ```
 
-Labels are the primary signal for both loops. If a PR has no AI label, the skills fall back to checking comment markers (`<!-- ai-review -->`, `<!-- feedback-addressed -->`).
+Labels are the primary signal for both loops. If a PR has no AI label, the skills read the actual comment contents to determine whether review or feedback handling is needed.
 
 Use `ai-pause` on the repo to gracefully stop all loops at the end of their current cycle. Use `priority:high` / `priority:critical` on issues to influence pickup order.
 

@@ -78,27 +78,23 @@ gh pr list --state open --label "needs-ai-review" --json number,title,url,isDraf
 
 Skip any draft PRs from the results.
 
-If no labeled PRs are found, fall back to comment-based detection for PRs that may not have labels:
+Also check for unlabeled PRs that may need review:
 
 ```
 gh pr list --state open --json number,title,url,isDraft,author,labels --limit 20
 ```
 
-For each non-draft PR without an `ai-changes-requested`, `needs-ai-review`, or `ai-approved` label, check its comment history:
+For each non-draft PR without an `ai-changes-requested`, `needs-ai-review`, or `ai-approved` label, read the comments:
 
 ```
 gh pr view <number> --comments --json comments
 ```
 
-Classify unlabeled PRs into one of:
+Read the actual comment contents and determine if the PR needs review. A PR needs review if:
+- It has no review comments at all (needs first review)
+- It has review feedback that was addressed (author pushed fixes or replied) but no subsequent review (needs re-review)
 
-| Condition | Action |
-|-----------|--------|
-| No `<!-- ai-review -->` comment exists | **Needs first review** |
-| `<!-- ai-review -->` exists, no `<!-- feedback-addressed -->` after it | **Already reviewed, skip** |
-| `<!-- feedback-addressed -->` exists AFTER the last `<!-- ai-review -->` | **Needs re-review** |
-
-Compare by comment order (later = more recent).
+Skip PRs where the last review had no requested changes and no new commits were pushed since.
 
 If no PRs need review (from either labels or comments), say "No PRs to review" and stop.
 

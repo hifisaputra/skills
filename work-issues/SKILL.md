@@ -77,22 +77,20 @@ First, check for PRs labeled `ai-changes-requested` — this is the primary sign
 gh pr list --author "@me" --state open --label "ai-changes-requested" --json number,title,url
 ```
 
-If no labeled PRs are found, fall back to comment-based detection for PRs that may not have labels (e.g. PRs created outside this workflow):
+Also check for unlabeled PRs that may have feedback:
 
 ```
 gh pr list --author "@me" --state open --json number,title,url,isDraft,labels
 ```
 
-For each PR without an `ai-changes-requested`, `needs-ai-review`, or `ai-approved` label, check comments:
+For each PR without an `ai-changes-requested`, `needs-ai-review`, or `ai-approved` label, read the comments:
 
 ```
 gh pr view <number> --comments
 gh api repos/{owner}/{repo}/pulls/<number>/comments
 ```
 
-A PR needs attention if:
-- It has review comments or PR comments with no `<!-- feedback-addressed -->` after them
-- It has review comments or PR comments posted AFTER the most recent `<!-- feedback-addressed -->` comment
+Read the actual comment contents and determine if there is unaddressed feedback — look for review comments requesting changes, questions from reviewers, or suggestions that haven't been acted on yet.
 
 If no PRs need attention, skip to Phase B.
 
