@@ -458,6 +458,12 @@ gh pr edit <pr-number> --add-label "needs-ai-review"
 
 ### B9. Next issue
 
+Return to main so the branch is free for other worktrees (e.g., `process-reviews`):
+
+```
+git checkout main
+```
+
 Report: "Finished #<number>. Moving to next cycle."
 
 Go back to the top of the loop (Phase A).

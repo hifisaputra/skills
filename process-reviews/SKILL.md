@@ -175,7 +175,7 @@ For each PR needing review:
 The `code-review` skill needs to read source files (not just diffs) to understand the full context of changes. Checkout the PR branch so file reads reflect the PR's state, including newly added files:
 
 ```
-gh pr checkout <number>
+gh pr checkout <number> --detach
 ```
 
 Re-check that the PR is not a draft (it could have been converted since Phase 1):
