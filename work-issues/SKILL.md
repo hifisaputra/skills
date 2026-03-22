@@ -1,46 +1,179 @@
 ---
 name: work-issues
-description: Automatically pick up ai-ready GitHub issues, implement them using TDD, and open draft PRs. Use when user says "work issues", "start working", "process backlog", or wants AI to autonomously implement GitHub issues.
+description: Autonomous loop that implements ai-ready GitHub issues, handles PR feedback, and asks clarifying questions when blocked. Use when user says "work issues", "start working", "process backlog", or wants AI to autonomously implement GitHub issues.
 ---
 
 # Work Issues
 
-Pick up `ai-ready` GitHub issues and implement them autonomously, one at a time.
+Autonomous loop that picks up `ai-ready` issues, implements them, and handles feedback on open PRs.
 
 ## Worktree Isolation
 
-This skill MUST run in its own git worktree to avoid conflicts with other parallel Claude instances (e.g. handle-pr-feedback, review-prs).
+This skill MUST run in its own git worktree to avoid conflicts with other parallel Claude instances.
 
-Before starting, set up a worktree if not already in one:
+Before starting, check if already in a worktree:
 
 ```
-# From the main repo clone
-git worktree add ../$(basename "$PWD")-issues main
-cd ../$(basename "$PWD")-issues
+git rev-parse --show-toplevel
 ```
 
-If already running inside a worktree, skip this step.
+If NOT already in a worktree for this skill, create one and switch to it using the `EnterWorktree` tool (if available). If `EnterWorktree` is not available, create one manually and prefix ALL subsequent commands with `cd <worktree-path> &&`:
 
-## Process
+```
+WORKTREE=$(git rev-parse --show-toplevel)/../$(basename "$(git rev-parse --show-toplevel)")-issues
+git worktree add "$WORKTREE" main 2>/dev/null || true
+```
 
-### 1. Find the next issue
+Then for every command in this skill, prefix with:
+```
+cd $WORKTREE && <command>
+```
+
+This is necessary because `cd` does not persist between Bash calls.
+
+## Loop Cycle
+
+Each cycle runs through three phases in order:
+
+0. **Pre-flight checks** — verify the environment is ready
+1. **Handle feedback** on existing PRs
+2. **Implement** the next available issue
+
+---
+
+## Phase 0: Pre-flight Checks
+
+Run these before every cycle. If any fail, stop and report the problem.
+
+```
+# Check gh is authenticated
+gh auth status
+
+# Check working tree is clean (no uncommitted changes)
+git status --porcelain
+```
+
+If `git status --porcelain` produces output, stop: "Working tree is dirty. Commit or stash changes before running."
+
+If `gh auth status` fails, stop: "GitHub CLI is not authenticated. Run `gh auth login`."
+
+Check for an `ai-pause` label on the repo — this is the graceful stop signal:
+
+```
+gh label list --search "ai-pause" --json name
+```
+
+If the `ai-pause` label exists, stop: "ai-pause label detected. Stopping gracefully. Remove the label to resume."
+
+---
+
+## Phase A: Handle PR Feedback
+
+### A1. Find PRs with unaddressed feedback
+
+```
+gh pr list --author "@me" --state open --json number,title,url,isDraft
+```
+
+For each PR, check for new feedback since the last `<!-- feedback-addressed -->` comment:
+
+```
+gh pr view <number> --comments
+gh api repos/{owner}/{repo}/pulls/<number>/comments
+```
+
+A PR needs attention if:
+- It has review comments or PR comments with no `<!-- feedback-addressed -->` after them
+- It has review comments or PR comments posted AFTER the most recent `<!-- feedback-addressed -->` comment
+
+If no PRs need attention, skip to Phase B.
+
+### A2. Address feedback
+
+For each PR with unaddressed feedback:
+
+```
+gh pr checkout <number>
+```
+
+Categorize each new comment:
+- **Fix**: concrete change requested — make the change, run tests
+- **Question**: reviewer wants clarification — reply with an answer; if it reveals a needed change, make it
+- **Nit**: style/preference — apply if reasonable, group into one commit
+
+Commit fixes:
+
+```
+git commit -m "fix(#<issue>): address review - <brief description>"
+git push
+```
+
+Post a summary:
+
+```
+gh pr comment <number> --body "$(cat <<'EOF'
+<!-- feedback-addressed -->
+Addressed review feedback:
+- <what was fixed>
+
+Ready for another look.
+EOF
+)"
+```
+
+Return to the issue branch or main before continuing.
+
+---
+
+## Phase B: Implement Next Issue
+
+### B0. Recover stale issues
+
+Check for issues stuck in `ai-in-progress` from a previous crashed run:
+
+```
+gh issue list --label "ai-in-progress" --state open --json number,title
+```
+
+For each one, check if there's an active branch or open PR:
+
+```
+git branch --list "issue-<number>-*"
+gh pr list --head "issue-<number>-*" --json number,state
+```
+
+- If a draft PR exists, the work was partially done — skip it (it will be handled when someone reviews it or closes it)
+- If no branch and no PR exist, the issue was claimed but never worked on — reset it:
+
+```
+gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-ready"
+gh issue comment <number> --body "Resetting to ai-ready — previous work session was interrupted before any progress was made."
+```
+
+### B1. Find the next issue
 
 ```
 gh issue list --label "ai-ready" --state open --json number,title,body,labels
 ```
 
-Select the next issue by:
-1. Skip issues labeled `ai-in-progress` or `ai-blocked`
-2. Skip issues whose "Blocked by" references are still open
-3. Pick the lowest-numbered eligible issue (oldest first)
+Also check for previously blocked issues that now have answers:
 
-If no issues are eligible, tell the user and stop.
+```
+gh issue list --label "ai-blocked" --state open --json number,title,body,labels
+```
 
-### 2. Claim the issue
+For `ai-blocked` issues, read the comments to see if a human has replied to the AI's question. If yes, treat it as eligible again.
 
-- Remove label `ai-ready`, add label `ai-in-progress`
-- Comment on the issue: "Starting work on this issue."
-- Create a branch: `git checkout -b issue-<number>-<short-slug>`
+Selection order:
+1. Unblocked `ai-blocked` issues with answered questions (priority first, then oldest)
+2. `ai-ready` issues not labeled `ai-in-progress` (priority first, then oldest)
+3. Skip issues whose "Blocked by" references are still open
+
+Priority: if an issue has a `priority:high` or `priority:critical` label, pick it before lower-priority or unlabeled issues.
+
+If no issues are eligible, report "No issues to work on" and stop.
+
+### B2. Claim the issue
 
 ```
 gh issue edit <number> --remove-label "ai-ready" --add-label "ai-in-progress"
@@ -48,25 +181,64 @@ gh issue comment <number> --body "Starting work on this issue."
 git checkout -b issue-<number>-<short-slug>
 ```
 
-### 3. Understand the issue
+For previously `ai-blocked` issues:
 
-Read the issue body. If it references a parent PRD, read that too. Explore relevant parts of the codebase to understand current state.
+```
+gh issue edit <number> --remove-label "ai-blocked" --add-label "ai-in-progress"
+gh issue comment <number> --body "Question answered. Resuming work."
+```
 
-If the issue is ambiguous or missing critical information:
-- Label it `ai-blocked`
-- Comment on the issue explaining what's unclear
-- Move to the next issue
+### B3. Understand the issue
 
-### 4. Plan
+Read the issue body. If it references a parent PRD, read that too. Explore relevant parts of the codebase.
 
-Write a brief plan as a comment on the issue:
+**If the issue is unclear or missing critical information:**
+
+- Comment on the issue with a specific question:
+
+```
+gh issue comment <number> --body "$(cat <<'EOF'
+<!-- ai-question -->
+I have a question before I can proceed:
+
+<specific question about what's unclear>
+
+Labeling as `ai-blocked` — I'll pick this up again once answered.
+EOF
+)"
+```
+
+- Label it `ai-blocked`, remove `ai-in-progress`:
+
+```
+gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-blocked"
+```
+
+- **Move to the next issue** (go back to B1)
+
+### B4. Estimate size
+
+Before planning, estimate how many lines of code this will likely require. If the estimate is >500 lines of changes:
+
+```
+gh issue comment <number> --body "This issue looks too large for autonomous implementation (~<estimate> lines). Consider breaking it into smaller issues."
+gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-blocked"
+```
+
+Move to the next issue.
+
+### B5. Plan
+
+Post a brief plan as a comment on the issue:
 - What you'll change
 - Which behaviors you'll test
 - Your TDD cycle order (RED-GREEN pairs)
 
-Do NOT ask the user to approve - just post the plan and start.
+Do NOT wait for approval — post the plan and start.
 
-### 5. Implement with TDD
+### B6. Implement with TDD
+
+Before writing code that uses external libraries or APIs, look up the current documentation first (via context7 `resolve-library-id` + `query-docs`, or WebSearch). Do not rely on memory for method signatures or options.
 
 For each behavior in your plan:
 
@@ -84,9 +256,9 @@ Rules:
 
 After all tests pass, refactor if needed. Run tests again.
 
-### 6. Commit and push
+### B7. Commit and push
 
-Make clean, atomic commits as you go. Each RED-GREEN cycle can be one commit, or group logically.
+Make clean, atomic commits as you go.
 
 ```
 git add -A
@@ -94,10 +266,11 @@ git commit -m "feat(#<number>): <description>"
 git push -u origin issue-<number>-<short-slug>
 ```
 
-### 7. Open a draft PR
+### B8. Open a draft PR
 
 ```
-gh pr create --draft --title "<issue title>" --body "Closes #<number>
+gh pr create --draft --title "<issue title>" --body "$(cat <<'EOF'
+Closes #<number>
 
 ## What was done
 
@@ -110,37 +283,58 @@ gh pr create --draft --title "<issue title>" --body "Closes #<number>
 ## Testing
 
 <what tests were added and what they verify>
-"
+EOF
+)"
 ```
 
-### 8. Update the issue
-
-- Remove `ai-in-progress`, add `ai-done`
-- Comment with a link to the PR
+### B9. Update the issue
 
 ```
 gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-done"
 gh issue comment <number> --body "PR opened: <pr-url>"
 ```
 
-### 9. Mark PR ready for review
+### B10. Wait for CI
 
-Convert the draft PR to ready for review:
+Check if the repo has CI checks configured. If it does, wait for them to pass:
 
 ```
-gh pr ready <number>
+gh pr checks <pr-number> --watch --fail-level all
 ```
 
-### 10. Next issue
+If checks fail:
+- Read the failure logs: `gh pr checks <pr-number>`
+- Fix the issue, commit, and push
+- Wait for checks again
+- If checks fail 3 times, leave the PR as draft, comment on the issue explaining the CI failure, and move to the next issue
 
-Report: "Finished #<number>. Moving to the next issue."
+### B11. Mark PR ready for review
 
-Go back to step 1. If no eligible issues remain, stop.
+Only mark ready after CI passes (or if the repo has no CI checks):
+
+```
+gh pr ready <pr-number>
+```
+
+### B12. Next issue
+
+Report: "Finished #<number>. Moving to next cycle."
+
+Go back to the top of the loop (Phase A).
+
+---
+
+## Usage with /loop
+
+```
+/loop 10m /work-issues
+```
 
 ## Safety Rails
 
-- Open PRs as drafts first, then mark ready for review when done - never merge
+- Open PRs as drafts first, then mark ready for review — never merge
 - If an issue seems too large (>500 lines of changes), stop and tell the user
 - If tests in the repo are failing before you start, stop and tell the user
 - If you encounter a conflict with another branch, stop and tell the user
 - Never force push
+- When blocked, always ask a specific question — never guess
