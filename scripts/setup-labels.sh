@@ -11,6 +11,9 @@ labels=(
   "ai-done|0E8A16|AI opened a draft PR"
   "ai-blocked|D93F0B|AI asked a question, waiting for answer"
   "ai-pause|BFD4F2|Pause AI loops gracefully"
+  "needs-ai-review|7057FF|PR is ready for AI review"
+  "ai-changes-requested|D93F0B|AI reviewed PR and requested changes"
+  "ai-approved|0E8A16|AI reviewed PR and approved"
   "priority:high|B60205|High priority issue"
   "priority:critical|E11D48|Critical priority issue"
 )

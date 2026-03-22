@@ -69,13 +69,21 @@ If the `ai-pause` label exists, stop: "ai-pause label detected. Stopping gracefu
 
 ## Phase A: Handle PR Feedback
 
-### A1. Find PRs with unaddressed feedback
+### A1. Find PRs needing attention
+
+First, check for PRs labeled `ai-changes-requested` — this is the primary signal:
 
 ```
-gh pr list --author "@me" --state open --json number,title,url,isDraft
+gh pr list --author "@me" --state open --label "ai-changes-requested" --json number,title,url
 ```
 
-For each PR, check for new feedback since the last `<!-- feedback-addressed -->` comment:
+If no labeled PRs are found, fall back to comment-based detection for PRs that may not have labels (e.g. PRs created outside this workflow):
+
+```
+gh pr list --author "@me" --state open --json number,title,url,isDraft,labels
+```
+
+For each PR without an `ai-changes-requested`, `needs-ai-review`, or `ai-approved` label, check comments:
 
 ```
 gh pr view <number> --comments
@@ -90,10 +98,17 @@ If no PRs need attention, skip to Phase B.
 
 ### A2. Address feedback
 
-For each PR with unaddressed feedback:
+For each PR needing attention:
 
 ```
 gh pr checkout <number>
+```
+
+Read the review comments:
+
+```
+gh pr view <number> --comments
+gh api repos/{owner}/{repo}/pulls/<number>/comments
 ```
 
 Categorize each new comment:
@@ -108,7 +123,7 @@ git commit -m "fix(#<issue>): address review - <brief description>"
 git push
 ```
 
-Post a summary:
+Post a summary and update labels:
 
 ```
 gh pr comment <number> --body "$(cat <<'EOF'
@@ -119,6 +134,12 @@ Addressed review feedback:
 Ready for another look.
 EOF
 )"
+```
+
+Update the PR label to request a new review:
+
+```
+gh pr edit <number> --remove-label "ai-changes-requested" --add-label "needs-ai-review"
 ```
 
 Return to the issue branch or main before continuing.
@@ -314,6 +335,7 @@ Only mark ready after CI passes (or if the repo has no CI checks):
 
 ```
 gh pr ready <pr-number>
+gh pr edit <pr-number> --add-label "needs-ai-review"
 ```
 
 ### B12. Next issue

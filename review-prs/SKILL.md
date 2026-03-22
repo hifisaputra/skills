@@ -70,17 +70,27 @@ If the `ai-pause` label exists, stop: "ai-pause label detected. Stopping gracefu
 
 ### 1. Find PRs needing review
 
+First, check for PRs labeled `needs-ai-review` — this is the primary signal:
+
 ```
-gh pr list --state open --json number,title,url,isDraft,author,reviews --limit 20
+gh pr list --state open --label "needs-ai-review" --json number,title,url,isDraft,author
 ```
 
-For each non-draft PR, check its comment history:
+Skip any draft PRs from the results.
+
+If no labeled PRs are found, fall back to comment-based detection for PRs that may not have labels:
+
+```
+gh pr list --state open --json number,title,url,isDraft,author,labels --limit 20
+```
+
+For each non-draft PR without an `ai-changes-requested`, `needs-ai-review`, or `ai-approved` label, check its comment history:
 
 ```
 gh pr view <number> --comments --json comments
 ```
 
-Classify each PR into one of:
+Classify unlabeled PRs into one of:
 
 | Condition | Action |
 |-----------|--------|
@@ -90,7 +100,7 @@ Classify each PR into one of:
 
 Compare by comment order (later = more recent).
 
-If no PRs need review, say "No PRs to review" and stop.
+If no PRs need review (from either labels or comments), say "No PRs to review" and stop.
 
 ### 2. Review each PR
 
@@ -146,7 +156,7 @@ For re-reviews, also verify:
 - Previous feedback was actually addressed (not just claimed)
 - New changes didn't introduce new issues
 
-#### e. Post the review
+#### e. Post the review and update labels
 
 If there are issues to flag:
 
@@ -167,6 +177,12 @@ EOF
   -f 'comments=[{"path":"<file>","line":<line>,"body":"<comment>"}]'
 ```
 
+Label the PR as needing changes:
+
+```
+gh pr edit <number> --remove-label "needs-ai-review" --add-label "ai-changes-requested"
+```
+
 If changes look good with no significant issues:
 
 ```
@@ -182,6 +198,12 @@ EOF
 )"
 ```
 
+Label the PR as approved:
+
+```
+gh pr edit <number> --remove-label "needs-ai-review" --add-label "ai-approved"
+```
+
 For re-reviews where all feedback was properly addressed:
 
 ```
@@ -195,6 +217,12 @@ All previous feedback has been addressed. Changes look good.
 *Automated review by Claude*
 EOF
 )"
+```
+
+Update the label:
+
+```
+gh pr edit <number> --remove-label "ai-changes-requested" --remove-label "needs-ai-review" --add-label "ai-approved"
 ```
 
 ### 3. Report

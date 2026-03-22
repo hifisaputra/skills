@@ -63,17 +63,30 @@ This creates all required labels:
 | `ai-done` | AI opened a draft PR |
 | `ai-blocked` | AI asked a question, waiting for answer |
 | `ai-pause` | Pause AI loops gracefully |
+| `needs-ai-review` | PR is ready for AI review |
+| `ai-changes-requested` | AI reviewed PR and requested changes |
+| `ai-approved` | AI reviewed PR and approved |
 | `priority:high` | High priority issue |
 | `priority:critical` | Critical priority issue |
 
 ## Label Lifecycle
 
+**Issues:**
 ```
 ai-ready  ->  ai-in-progress  ->  ai-done (draft PR opened)
    ^               |
    |               v
    +------- ai-blocked (question asked, waiting for answer)
 ```
+
+**PRs:**
+```
+needs-ai-review  ->  ai-changes-requested  ->  needs-ai-review (after fixes)
+       |                                              |
+       +---------------> ai-approved <----------------+
+```
+
+Labels are the primary signal for both loops. If a PR has no AI label, the skills fall back to checking comment markers (`<!-- ai-review -->`, `<!-- feedback-addressed -->`).
 
 Use `ai-pause` on the repo to gracefully stop all loops at the end of their current cycle. Use `priority:high` / `priority:critical` on issues to influence pickup order.
 
