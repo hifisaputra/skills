@@ -69,7 +69,7 @@ If `gh auth status` fails, stop: "GitHub CLI is not authenticated. Run `gh auth 
 Ensure required labels exist (run once per cycle — `gh label create` is a no-op if the label already exists):
 
 ```
-for label in ai-ready ai-in-progress ai-done ai-blocked ai-pause needs-ai-review ai-changes-requested ai-approved; do
+for label in ai-ready ai-in-progress ai-done ai-blocked ai-needs-input ai-pause needs-ai-review ai-changes-requested ai-approved prd; do
   gh label create "$label" --force 2>/dev/null || true
 done
 ```
@@ -231,7 +231,29 @@ Also check for previously blocked issues that now have answers:
 gh issue list --label "ai-blocked" --state open --limit 100 --json number,title,body,labels
 ```
 
-For `ai-blocked` issues, read the comments to see if a human has replied to the AI's question. Human comments are those that do NOT start with `**[AI]**`. If a human comment exists after the last AI question, treat the issue as eligible again.
+For each `ai-blocked` issue, determine why it's blocked and whether it's been unblocked:
+
+**Dependency-blocked** (has a `## Blocked by` section with issue references):
+Check if all referenced blocking issues are now closed:
+
+```
+gh issue view <blocking-number> --json state --jq '.state'
+```
+
+If all blockers are closed, the issue is unblocked — relabel it to `ai-ready`:
+
+```
+gh issue edit <number> --remove-label "ai-blocked" --add-label "ai-ready"
+gh issue comment <number> --body "**[AI]** All blocking issues are now closed. Moving to ai-ready."
+```
+
+Then treat it as eligible in the current cycle.
+
+**Question-blocked** (AI posted a question via `**[AI]** I have a question`):
+Read the comments to see if a human has replied. Human comments are those that do NOT start with `**[AI]**`. If a human comment exists after the last AI question, treat the issue as eligible again.
+
+**Failure-blocked** (AI posted a failure message like "Implementation failed", "too large", "Merge conflict"):
+Only treat as eligible if a human has commented since the failure (indicating they've addressed the underlying problem). Otherwise leave it blocked.
 
 Selection order:
 1. Unblocked `ai-blocked` issues with answered questions (priority first, then oldest)
