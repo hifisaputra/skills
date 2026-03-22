@@ -133,7 +133,7 @@ EOF
 )"
 ```
 
-Update the PR label to request a new review:
+Update the PR label to request a new review (this also ensures previously unlabeled PRs enter the label workflow):
 
 ```
 gh pr edit <number> --remove-label "ai-changes-requested" --add-label "needs-ai-review"

@@ -100,9 +100,20 @@ If no PRs need review (from either labels or comments), say "No PRs to review" a
 
 ### 2. Review each PR
 
-For each PR needing review (first review or re-review):
+For each PR needing review:
 
-#### a. Get the diff
+#### a. Determine if this is a first review or re-review
+
+Read the PR comments to check if you've already posted a review on this PR:
+
+```
+gh pr view <number> --comments
+```
+
+- If no previous AI review comment exists → **first review**
+- If a previous AI review exists → **re-review** (feedback was addressed and the PR was relabeled `needs-ai-review`)
+
+#### b. Get the diff
 
 For first reviews:
 
@@ -110,21 +121,15 @@ For first reviews:
 gh pr diff <number>
 ```
 
-For re-reviews, focus on what changed since the last review:
+For re-reviews, get the full diff but also read your previous review comments so you can focus on whether the feedback was addressed and check for new issues in the latest changes.
 
-```
-gh pr view <number> --json commits
-```
-
-Check commits after the last AI review comment. Get the diff for just those changes if possible, otherwise review the full diff.
-
-#### b. Get PR context
+#### c. Get PR context
 
 ```
 gh pr view <number> --json title,body,files
 ```
 
-#### c. Read surrounding source code
+#### d. Read surrounding source code
 
 The diff alone is not enough for a meaningful review. For each changed file, read the relevant sections to understand the context around the changes:
 
@@ -137,7 +142,7 @@ For each file, read at least the surrounding functions/classes where changes wer
 - Duplicated logic that already exists elsewhere in the file
 - Breaking changes to interfaces used by other parts of the codebase
 
-#### d. Analyze the changes
+#### e. Analyze the changes
 
 Review for:
 - **Bugs**: logic errors, off-by-one, null/undefined risks, race conditions
@@ -152,7 +157,7 @@ For re-reviews, also verify:
 - Previous feedback was actually addressed (not just claimed)
 - New changes didn't introduce new issues
 
-#### e. Post the review and update labels
+#### f. Post the review and update labels
 
 If there are issues to flag:
 
