@@ -33,6 +33,7 @@ Before interviewing the user, proactively explore the codebase to understand the
 - Existing modules related to the idea
 - Database schemas, API routes, or config that would be affected
 - Test infrastructure and conventions
+- **File ownership boundaries** — which directories/files belong to which logical modules. This matters later when you need to split work into non-overlapping issues for parallel implementation.
 
 This exploration informs both the interview and the eventual issue breakdown. Spend enough time here that you can have a technical conversation about the idea without constantly asking the user "where does X live?"
 
@@ -94,6 +95,30 @@ Break the PRD into **tracer bullet** issues. Each issue is a thin vertical slice
 
 **Scope estimation:** For each slice, estimate the rough size (small: <100 lines, medium: 100-300 lines, large: 300-500 lines). If any slice looks like it would exceed ~500 lines of changes, split it further — the downstream implementation skill has a ~500 line threshold and will reject issues that are too large.
 
+#### Minimize file conflicts for parallel work
+
+AI agents pick up unblocked `ai-ready` issues in parallel. If two parallel issues modify the same files, their PRs will conflict and one will need to be rebased or redone. This is wasteful, so the issue breakdown should minimize file overlap between issues that can run at the same time.
+
+**Keep every issue as a vertical slice.** Do not split work into horizontal layers (e.g., "all schema changes" then "all renderer changes" then "all UI changes") just to avoid file conflicts. Each issue should still touch all the layers it needs end-to-end. The way to avoid conflicts is through dependency chains, not by breaking vertical slices apart.
+
+After defining the slices, do a file-overlap analysis:
+
+1. **Map the file footprint** of each slice — list the files or directories it will likely touch. Be specific (e.g., "src/api/routes/widgets.ts, src/db/migrations/, src/components/WidgetList.tsx") rather than vague ("the API layer"). Use what you learned in step 2 about the codebase structure.
+
+2. **Identify conflicts** — two slices conflict if their file footprints overlap. Common conflict hotspots:
+   - Shared config files (routes index, DB schema, app entrypoint)
+   - Barrel/index files that re-export modules
+   - Shared types or interfaces files
+   - CSS/style files used across components
+
+3. **Resolve conflicts through dependency chains.** When two vertical slices touch the same files, chain them with a dependency so they run sequentially instead of in parallel. Pick the natural ordering — the slice that establishes shared groundwork (e.g., adds the DB table, creates the base component) goes first, and the slice that builds on it depends on it. If there's no natural ordering, just pick one. The key rule: **no two simultaneously-unblocked issues should share files.** Add as many dependency links as needed to enforce this — a longer chain is better than a merge conflict.
+
+4. **Maximize parallel lanes.** Arrange the dependency graph so the maximum number of issues are unblocked at any given time, while respecting the constraint above. Think of it as coloring a graph: issues in the same "color" (parallel group) must not conflict on files. Spread unrelated slices across separate lanes that can run simultaneously.
+
+If a shared file is unavoidable across many slices (e.g., a routes index where every feature adds a line), front-load those changes into the first slice in the chain so later slices only append to what the first one established.
+
+#### Present the breakdown
+
 Present the breakdown to the user as a numbered list showing:
 - **Title**: short descriptive name
 - **Type**: HITL (needs human input) / AFK (fully autonomous)
@@ -101,8 +126,16 @@ Present the breakdown to the user as a numbered list showing:
 - **Blocked by**: dependencies on other slices
 - **User stories covered**: which stories from the PRD
 - **Estimated size**: small / medium / large
+- **Files touched**: key files/directories this slice will modify
 
-Ask: Does the granularity feel right? Any slices to merge or split? Do the priorities look right?
+After the list, show a **parallel lanes** view — which issues can run simultaneously without conflicts:
+
+```
+Lane 1: #1 Setup DB schema → #3 Widget CRUD API → #5 Widget permissions
+Lane 2: #2 Dashboard layout  → #4 Widget list component
+```
+
+This makes the conflict-avoidance strategy visible. Ask: Does the granularity feel right? Any slices to merge or split? Do the dependency chains make sense for avoiding conflicts?
 
 Iterate until approved.
 
