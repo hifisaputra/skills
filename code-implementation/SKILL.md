@@ -83,6 +83,17 @@ Prefer `scripts.lint` from `package.json` over individual tool detection — it 
 
 If found, run the linter after implementation (in both Step 5 and Step 6) to catch style issues before committing.
 
+### Build command
+
+Detect the build command:
+- `package.json` → `scripts.build` → `npm run build` (use detected package manager)
+- `next.config.*` without explicit build script → `next build`
+- `Cargo.toml` → `cargo build`
+- `Makefile` / `Justfile` → `make build` / `just build`
+- `pyproject.toml` with `[build-system]` → the configured build backend
+
+If found, run the build after tests and lint pass (in both Step 5 and Step 6) to catch type errors, broken imports, and other compilation issues before pushing.
+
 ## Step 5: Implement with TDD
 
 For **bug fixes**, start by writing a regression test that reproduces the bug — confirm it fails, then fix the code and confirm the test passes. This ensures the bug can't silently return.
@@ -118,6 +129,8 @@ Run the full test suite one final time to make sure nothing else broke:
 
 If a linter was detected in Step 4, run it now and fix any issues before proceeding.
 
+If a build command was detected in Step 4, run it now and fix any errors before proceeding. Build failures (type errors, missing imports, invalid config) must be resolved — do not push code that doesn't build.
+
 If any pre-existing tests broke, fix them before proceeding.
 
 Skip to Step 7.
@@ -130,6 +143,8 @@ For documentation, configuration, or projects without test infrastructure — ma
 - Nothing unrelated was accidentally modified
 
 If a linter was detected in Step 4, run it and fix any issues.
+
+If a build command was detected in Step 4, run it and fix any errors before proceeding.
 
 ## Step 7: Push
 
