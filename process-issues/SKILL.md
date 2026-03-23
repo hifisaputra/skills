@@ -27,8 +27,10 @@ If NOT already in a worktree for this skill, create one and switch to it using t
 
 ```
 WORKTREE=$(git rev-parse --show-toplevel)/../$(basename "$(git rev-parse --show-toplevel)")-issues
-git worktree add "$WORKTREE" main 2>/dev/null || true
+git worktree add --detach "$WORKTREE" main 2>/dev/null || true
 ```
+
+Using `--detach` is important because `main` is typically already checked out in the primary worktree — `git worktree add "$WORKTREE" main` will silently fail in that case.
 
 Then for every command in this skill, prefix with:
 ```
@@ -36,6 +38,12 @@ cd $WORKTREE && <command>
 ```
 
 This is necessary because `cd` does not persist between Bash calls.
+
+After creating or entering the worktree, install dependencies if needed:
+
+```
+cd $WORKTREE && [ ! -d "node_modules" ] && (bun install 2>/dev/null || npm install 2>/dev/null || true)
+```
 
 ## Loop Cycle
 
@@ -77,10 +85,18 @@ done
 Check for the `ai-pause` label — this is the graceful stop signal. The mechanism: **create** the `ai-pause` label to pause, **delete** it (`gh label delete ai-pause -y`) to resume.
 
 ```
-gh label list --search "ai-pause" --json name
+gh label list --search "ai-pause" --json name --jq '.[].name' | grep -qx "ai-pause"
 ```
 
+The `--search` flag is a fuzzy substring match (it returns labels like `ai-ready`, `ai-done` too), so pipe through `grep -qx` for an exact match. If `grep` matches, the label exists — stop. If `grep` exits non-zero, no exact match — proceed.
+
 If the `ai-pause` label exists, stop: "ai-pause label detected. Stopping gracefully. Delete the label (`gh label delete ai-pause -y`) to resume."
+
+Set up the repo variable for API calls used later:
+
+```
+REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+```
 
 ---
 
@@ -180,11 +196,11 @@ Update the PR label to request a new review (this also ensures previously unlabe
 gh pr edit <number> --remove-label "ai-changes-requested" --add-label "needs-ai-review"
 ```
 
-Clean up before continuing — return to main and ensure a clean state:
+Clean up before continuing — return to a clean state. In a detached worktree, use `git checkout --detach origin/main` since `main` may be checked out elsewhere:
 
 ```
-git checkout main
-git pull origin main
+git fetch origin main
+git checkout --detach origin/main
 git status --porcelain
 ```
 
@@ -268,11 +284,11 @@ If no issues are eligible, report "No issues to work on" and stop.
 
 ### B2. Claim the issue
 
-Sync main before branching to avoid working on stale code:
+Sync to latest main before branching to avoid working on stale code. In a worktree where `main` is checked out elsewhere, use `git fetch` + `git reset` instead of `checkout main`:
 
 ```
-git checkout main
-git pull origin main
+git fetch origin main
+git reset --hard origin/main
 ```
 
 Then claim and create the branch. Check for an existing branch first (the slug may differ from what you'd generate):
@@ -329,7 +345,7 @@ gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-blocked"
 - Return to main before moving on:
 
 ```
-git checkout main
+git checkout --detach origin/main
 ```
 
 - **Move to the next issue** (go back to B1)
@@ -344,28 +360,35 @@ If `code-implementation` fails for any reason, clean up and move on. The common 
 ```
 gh issue comment <number> --body "**[AI]** This issue looks too large for autonomous implementation. Consider breaking it into smaller issues."
 gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-blocked"
-git checkout main
+git checkout --detach origin/main
 ```
 
 **Merge conflict:**
 ```
 gh issue comment <number> --body "**[AI]** Merge conflict with main. Leaving for manual resolution."
 gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-blocked"
-git checkout main
+git checkout --detach origin/main
 ```
 
 **Existing tests failing (before any changes were made):**
 ```
 gh issue comment <number> --body "**[AI]** Existing test suite is failing before any changes. Skipping until the test suite is green."
 gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-blocked"
-git checkout main
+git checkout --detach origin/main
+```
+
+**Existing build failing (before any changes were made):**
+```
+gh issue comment <number> --body "**[AI]** Project build is failing before any changes (pre-existing issue on main). Skipping until the build is green."
+gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-blocked"
+git checkout --detach origin/main
 ```
 
 **Any other failure** (push rejected, ambiguous requirements the skill couldn't resolve, unexpected errors):
 ```
 gh issue comment <number> --body "**[AI]** Implementation failed: <brief description of what went wrong>. Leaving for manual investigation."
 gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-blocked"
-git checkout main
+git checkout --detach origin/main
 ```
 
 The key invariant: **never leave an issue labeled `ai-in-progress` after a failure**. Always move it to `ai-blocked` with a comment explaining what happened, then return to main.
@@ -406,7 +429,7 @@ If `gh pr create` fails (e.g., no commits ahead of main, permission error), trea
 ```
 gh issue comment <number> --body "**[AI]** Implementation completed but PR creation failed: <error>. Branch `<branch-name>` has the changes."
 gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-blocked"
-git checkout main
+git checkout --detach origin/main
 ```
 
 ### B6. Update the issue
@@ -458,10 +481,10 @@ gh pr edit <pr-number> --add-label "needs-ai-review"
 
 ### B9. Next issue
 
-Return to main so the branch is free for other worktrees (e.g., `process-reviews`):
+Return to a clean state so the branch is free for other worktrees. In a detached worktree, use `git checkout --detach origin/main` since `main` may be checked out elsewhere:
 
 ```
-git checkout main
+git checkout --detach origin/main
 ```
 
 Report: "Finished #<number>. Moving to next cycle."

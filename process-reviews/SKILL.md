@@ -27,8 +27,10 @@ If NOT already in a worktree for this skill, create one and switch to it using t
 
 ```
 WORKTREE=$(git rev-parse --show-toplevel)/../$(basename "$(git rev-parse --show-toplevel)")-reviews
-git worktree add "$WORKTREE" main 2>/dev/null || true
+git worktree add --detach "$WORKTREE" main 2>/dev/null || true
 ```
+
+Using `--detach` is important because `main` is typically already checked out in the primary worktree — `git worktree add "$WORKTREE" main` will silently fail in that case.
 
 Then for every command in this skill, prefix with:
 ```
@@ -79,8 +81,10 @@ done
 Check for the `ai-pause` label — **create** it to pause, **delete** it (`gh label delete ai-pause -y`) to resume:
 
 ```
-gh label list --search "ai-pause" --json name
+gh label list --search "ai-pause" --json name --jq '.[].name' | grep -qx "ai-pause"
 ```
+
+The `--search` flag is a fuzzy substring match (it returns labels like `ai-ready`, `ai-done` too), so pipe through `grep -qx` for an exact match. If `grep` matches, the label exists — stop. If `grep` exits non-zero, no exact match — proceed.
 
 If the `ai-pause` label exists, stop: "ai-pause label detected. Stopping gracefully. Delete the label (`gh label delete ai-pause -y`) to resume."
 
@@ -118,9 +122,11 @@ For each non-draft `ai-approved` PR, compare the latest commit date against the 
 # Get last commit date
 gh pr view <number> --json commits --jq '.commits[-1].committedDate'
 
-# Get last AI review comment date
-gh api repos/$REPO/pulls/<number>/comments --jq '[.[] | select(.body | startswith("**[AI]**")) | .created_at] | sort | last'
+# Get last AI review comment date — check BOTH issue comments (top-level) and review comments (inline on diff)
+gh pr view <number> --json comments --jq '[.comments[] | select(.body | startswith("**[AI]**")) | .createdAt] | sort | last'
 ```
+
+Note: use `gh pr view --json comments` (issue-level comments where review summaries appear), NOT `gh api repos/$REPO/pulls/<number>/comments` (which returns inline diff comments only). AI reviews post their summary as a review body which shows up in issue comments.
 
 If the last commit is newer than the last AI review, the PR needs re-review. Remove the stale label:
 
@@ -203,10 +209,10 @@ If `code-review` fails or returns no verdict (e.g., it encounters an error), log
 
 ### Return to main
 
-After each review (success or failure), return to main before processing the next PR:
+After each review (success or failure), return to a clean state before processing the next PR. In a detached worktree, use `git checkout --detach origin/main` since `main` may be checked out elsewhere:
 
 ```
-git checkout main
+git checkout --detach origin/main
 ```
 
 ---
