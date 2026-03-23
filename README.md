@@ -57,7 +57,7 @@ You can also create them manually:
 
 ```bash
 for label in ai-ready ai-in-progress ai-done ai-blocked ai-needs-input needs-ai-review ai-changes-requested ai-approved prd; do
-  gh label create "$label" --force 2>/dev/null || true
+  gh label create "$label" 2>/dev/null || true
 done
 ```
 
