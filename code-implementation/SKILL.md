@@ -83,6 +83,28 @@ Prefer `scripts.lint` from `package.json` over individual tool detection — it 
 
 If found, run the linter after implementation (in both Step 5 and Step 6) to catch style issues before committing.
 
+### shadcn/ui components
+
+Check for `components.json` at the project root. If it exists, the project uses shadcn/ui. Read it to find:
+- The UI component directory (from `aliases.ui`, e.g. `~/components/ui`)
+- The package manager (from the lockfile, as detected above)
+
+List the already-installed components:
+
+```
+ls <ui-directory>/
+```
+
+During implementation, when you need a shadcn component that isn't already installed, install it before writing code that imports it:
+
+```
+npx shadcn@latest add <component-name>
+```
+
+Use the detected package manager's runner (`bunx`, `pnpx`, `npx`). Common components: `button`, `card`, `dialog`, `dropdown-menu`, `input`, `select`, `table`, `tabs`, `toast`, `form`, `label`, `textarea`, `checkbox`, `radio-group`, `switch`, `sheet`, `popover`, `tooltip`, `alert`, `badge`, `separator`, `skeleton`, `avatar`, `accordion`, `command`, `calendar`, `slider`.
+
+Do not manually create component files that shadcn can generate — the CLI handles styling, variants, and dependencies correctly.
+
 ### Build command
 
 Detect the build command:
@@ -98,7 +120,7 @@ If found, run the build after tests and lint pass (in both Step 5 and Step 6) to
 
 For **bug fixes**, start by writing a regression test that reproduces the bug — confirm it fails, then fix the code and confirm the test passes. This ensures the bug can't silently return.
 
-For **new features**, implement each behavior in your plan:
+For **new features**, install any missing shadcn/ui components first (if the project uses shadcn, as detected in Step 4), then implement each behavior in your plan:
 
 ```
 RED:   Write one test that captures expected behavior → verify it fails
@@ -137,7 +159,7 @@ Skip to Step 7.
 
 ## Step 6: Implement directly (no tests)
 
-For documentation, configuration, or projects without test infrastructure — make the changes and verify them manually. Check that:
+For documentation, configuration, or projects without test infrastructure — install any missing shadcn/ui components first (if applicable), then make the changes and verify them manually. Check that:
 - Files are syntactically valid
 - Changes match the task requirements
 - Nothing unrelated was accidentally modified
