@@ -16,66 +16,14 @@ Each cycle clears the pipeline from the end first:
 3. **Feedback** — address `ai-changes-requested` PRs (produces `needs-ai-review`)
 4. **Implement** — pick up the next `ai-ready` issue (produces new PRs)
 
-## Comment Authorship
+## Shared Setup
 
-Every comment posted by AI MUST start with `**[AI]**`. When reading comments:
-- Starts with `**[AI]**` → AI (previous runs)
-- Does NOT start with `**[AI]**` → human
-
-## Worktree Isolation
-
-This skill MUST run in its own git worktree.
-
-```
-git rev-parse --show-toplevel
-```
-
-If NOT already in a worktree for this skill, create one:
-
-```
-WORKTREE=$(git rev-parse --show-toplevel)/../$(basename "$(git rev-parse --show-toplevel)")-supervisor
-git worktree add --detach "$WORKTREE" main 2>/dev/null || true
-```
-
-Prefix ALL subsequent commands with `cd $WORKTREE &&`. Install dependencies if needed:
-
-```
-cd $WORKTREE && [ ! -d "node_modules" ] && (bun install 2>/dev/null || npm install 2>/dev/null || true)
-```
-
----
-
-## Phase 0: Pre-flight
-
-Run before every cycle. If any fail, stop and report.
-
-```
-git worktree prune
-gh auth status
-git status --porcelain
-```
-
-If dirty → stop. If not authenticated → stop.
-
-Ensure labels exist:
-
-```
-for label in ai-ready ai-in-progress ai-done ai-blocked ai-needs-input needs-ai-review ai-changes-requested ai-approved prd; do
-  gh label create "$label" 2>/dev/null || true
-done
-```
-
-Check `ai-pause` (create label to pause, delete to resume):
-
-```
-gh label list --search "ai-pause" --json name --jq '.[].name' | grep -qx "ai-pause"
-```
-
-`--search` is fuzzy, so `grep -qx` is needed for exact match. If found → stop gracefully.
-
-```
-REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-```
+Read `references/shared.md` for:
+- **Comment authorship** convention (`**[AI]**` prefix)
+- **Worktree isolation** — use suffix `-supervisor`
+- **Pre-flight checks** (Phase 0) — worktree prune, gh auth, clean tree, label creation, pause check, repo variable
+- **Rate limit handling**
+- **Safety rails**
 
 ---
 
@@ -92,6 +40,8 @@ gh pr list --state open --label "ai-approved" --json number,title,url,isDraft,he
 Filter out drafts. If none → skip to Phase 2.
 
 ### 1.2 Verify each PR
+
+**Stale approval check** — verify no new commits since last AI review (see `references/shared.md` → "New-Commit Check for Approved PRs"). If stale, relabel to `needs-ai-review` and skip — this PR will be picked up in Phase 2.
 
 **Issue resolution** — extract issue number from PR body (`Closes #N`, `Fixes #N`):
 
@@ -228,9 +178,24 @@ For each without workflow labels, read comments and check for unaddressed human 
 gh pr list --author "@me" --state closed --limit 10 --json number,title,mergedAt,body,closedAt
 ```
 
-For closed PRs where `mergedAt` is empty, extract issue number. If issue still has `ai-done` label and no human assignee, reset to `ai-ready`.
+For each closed PR where `mergedAt` is empty (not merged), extract the issue number from the body (`Closes #<number>`). Before resetting, verify the issue still has the `ai-done` label and hasn't been manually reassigned:
+
+```
+gh issue view <number> --json labels,assignees --jq '.labels[].name' | grep -q "ai-done"
+```
+
+Only if the issue is still labeled `ai-done` and has no human assignee:
+
+```
+gh issue edit <number> --remove-label "ai-done" --add-label "ai-ready"
+gh issue comment <number> --body "**[AI]** PR #<pr-number> was closed without merging. Resetting to ai-ready for a fresh attempt."
+```
+
+Skip if the issue was already relabeled — that means someone handled it manually.
 
 ### 3.2 Address feedback
+
+**Review-cycle limit:** Before addressing feedback, check if this PR has hit the review-cycle limit (see `references/shared.md` → "Review-Cycle Limit"). If it has been through 3+ AI feedback cycles, escalate instead of continuing. Otherwise proceed with the feedback below.
 
 For each PR:
 
@@ -279,8 +244,19 @@ gh pr list --author "@me" --state open --json number,headRefName --jq ".[] | sel
 ```
 
 - Open PR exists → skip (will be handled when reviewed/closed)
-- Branch exists but no PR → skip (leave for manual inspection)
-- No branch, no PR → reset to `ai-ready`
+- Branch exists (local or remote) but no PR → the work started but wasn't finished. Reset to `ai-ready`:
+
+```
+gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-ready"
+gh issue comment <number> --body "**[AI]** Resetting to ai-ready — previous work session was interrupted before a PR was opened."
+```
+
+- No branch, no PR → the issue was claimed but never worked on. Reset to `ai-ready`:
+
+```
+gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-ready"
+gh issue comment <number> --body "**[AI]** Resetting to ai-ready — previous work session was interrupted before any progress was made."
+```
 
 ### 4.1 Find the next issue
 
@@ -294,7 +270,9 @@ For `ai-blocked` issues, check if unblocked:
 - **Question-blocked** — check if human replied after last AI question
 - **Failure-blocked** — only resume if human commented since failure
 
-Selection: unblocked issues first, then `ai-ready`. Priority labels first (`priority:high`, `priority:critical`), then oldest.
+Also check for `ai-needs-input` issues that now have human responses (see `references/shared.md` → "ai-needs-input Transition"). Any issues transitioned to `ai-ready` become eligible in the current cycle.
+
+Selection: unblocked issues first, then newly-transitioned `ai-needs-input` issues, then `ai-ready`. Priority labels first (`priority:high`, `priority:critical`), then oldest.
 
 **Persistent failure guard:** Skip issues attempted 2+ times without new human input.
 
