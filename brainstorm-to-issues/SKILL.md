@@ -144,8 +144,10 @@ Iterate until approved.
 Before creating anything, save the full list of planned issues (titles, bodies, labels, dependencies) to a local file as a backup:
 
 ```
-<project-root>/brainstorm-<short-name>.json
+<project-root>/brainstorm-<short-name>-<YYYYMMDD-HHMMSS>.json
 ```
+
+Use `date +%Y%m%d-%H%M%S` for the timestamp. This prevents collisions when multiple brainstorms run simultaneously.
 
 This ensures nothing is lost if issue creation fails partway through. If a `gh issue create` call fails, stop, report which issues were created and which remain, and offer to retry the remaining ones.
 
