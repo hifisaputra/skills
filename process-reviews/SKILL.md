@@ -104,6 +104,14 @@ For each PR needing review:
 
 The `code-review` skill needs to read source files (not just diffs) to understand the full context of changes. Checkout the PR branch so file reads reflect the PR's state, including newly added files:
 
+Claim the PR by removing `needs-ai-review` immediately:
+
+```
+gh pr edit <number> --remove-label "needs-ai-review"
+```
+
+The correct label (`ai-approved` or `ai-changes-requested`) is applied after review completes. If the review fails or is skipped, re-add `needs-ai-review`.
+
 ```
 gh pr checkout <number> --detach
 ```

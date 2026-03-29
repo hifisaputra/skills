@@ -73,6 +73,14 @@ If no PRs need attention, skip to Phase B.
 
 For each PR needing attention:
 
+Claim the PR immediately to prevent parallel loops from picking it up:
+
+```
+gh pr edit <number> --remove-label "ai-changes-requested"
+```
+
+Then proceed with checkout and analysis. The `needs-ai-review` label is added after work is complete.
+
 ```
 gh pr checkout <number>
 ```
@@ -201,7 +209,7 @@ Selection order:
 
 Priority: if an issue has a `priority:high` or `priority:critical` label, pick it before lower-priority or unlabeled issues.
 
-**Persistent failure guard:** Before selecting an `ai-ready` issue, scan its comments for previous `**[AI]**` failure messages (e.g., "Implementation failed", "too large", "Merge conflict"). If the same issue has been attempted and failed 2+ times without new human input in between, skip it — it likely needs human intervention even though it's labeled `ai-ready`. Leave it for the next cycle or until a human comments.
+**Persistent failure guard:** Before selecting an issue, count structured failure comments (see `references/shared.md` → "Structured Failure Comments"). If ≥ 2 attempts and no human comment since last failure, skip the issue.
 
 If no issues are eligible, report "No issues to work on" and stop.
 
@@ -281,35 +289,55 @@ If `code-implementation` fails for any reason, clean up and move on. The common 
 
 **Too large (>500 lines):**
 ```
-gh issue comment <number> --body "**[AI]** This issue looks too large for autonomous implementation. Consider breaking it into smaller issues."
+ATTEMPTS=$(gh issue view <number> --json comments --jq '[.comments[] | select(.body | test("^\\*\\*\\[AI\\]\\*\\* ❌ \\*\\*Attempt failed\\*\\*"))] | length')
+NEXT=$((ATTEMPTS + 1))
+gh issue comment <number> --body "**[AI]** ❌ **Attempt failed** (attempt #$NEXT)
+
+This issue looks too large for autonomous implementation. Consider breaking it into smaller issues."
 gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-blocked"
 git checkout --detach origin/main
 ```
 
 **Merge conflict:**
 ```
-gh issue comment <number> --body "**[AI]** Merge conflict with main. Leaving for manual resolution."
+ATTEMPTS=$(gh issue view <number> --json comments --jq '[.comments[] | select(.body | test("^\\*\\*\\[AI\\]\\*\\* ❌ \\*\\*Attempt failed\\*\\*"))] | length')
+NEXT=$((ATTEMPTS + 1))
+gh issue comment <number> --body "**[AI]** ❌ **Attempt failed** (attempt #$NEXT)
+
+Merge conflict with main. Leaving for manual resolution."
 gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-blocked"
 git checkout --detach origin/main
 ```
 
 **Existing tests failing (before any changes were made):**
 ```
-gh issue comment <number> --body "**[AI]** Existing test suite is failing before any changes. Skipping until the test suite is green."
+ATTEMPTS=$(gh issue view <number> --json comments --jq '[.comments[] | select(.body | test("^\\*\\*\\[AI\\]\\*\\* ❌ \\*\\*Attempt failed\\*\\*"))] | length')
+NEXT=$((ATTEMPTS + 1))
+gh issue comment <number> --body "**[AI]** ❌ **Attempt failed** (attempt #$NEXT)
+
+Existing test suite is failing before any changes. Skipping until the test suite is green."
 gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-blocked"
 git checkout --detach origin/main
 ```
 
 **Existing build failing (before any changes were made):**
 ```
-gh issue comment <number> --body "**[AI]** Project build is failing before any changes (pre-existing issue on main). Skipping until the build is green."
+ATTEMPTS=$(gh issue view <number> --json comments --jq '[.comments[] | select(.body | test("^\\*\\*\\[AI\\]\\*\\* ❌ \\*\\*Attempt failed\\*\\*"))] | length')
+NEXT=$((ATTEMPTS + 1))
+gh issue comment <number> --body "**[AI]** ❌ **Attempt failed** (attempt #$NEXT)
+
+Project build is failing before any changes (pre-existing issue on main). Skipping until the build is green."
 gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-blocked"
 git checkout --detach origin/main
 ```
 
 **Any other failure** (push rejected, ambiguous requirements the skill couldn't resolve, unexpected errors):
 ```
-gh issue comment <number> --body "**[AI]** Implementation failed: <brief description of what went wrong>. Leaving for manual investigation."
+ATTEMPTS=$(gh issue view <number> --json comments --jq '[.comments[] | select(.body | test("^\\*\\*\\[AI\\]\\*\\* ❌ \\*\\*Attempt failed\\*\\*"))] | length')
+NEXT=$((ATTEMPTS + 1))
+gh issue comment <number> --body "**[AI]** ❌ **Attempt failed** (attempt #$NEXT)
+
+Implementation failed: <brief description of what went wrong>. Leaving for manual investigation."
 gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-blocked"
 git checkout --detach origin/main
 ```

@@ -274,7 +274,7 @@ Also check for `ai-needs-input` issues that now have human responses (see `refer
 
 Selection: unblocked issues first, then newly-transitioned `ai-needs-input` issues, then `ai-ready`. Priority labels first (`priority:high`, `priority:critical`), then oldest.
 
-**Persistent failure guard:** Skip issues attempted 2+ times without new human input.
+**Persistent failure guard:** Before selecting an issue, count structured failure comments (see `references/shared.md` → "Structured Failure Comments"). If ≥ 2 attempts and no human comment since last failure, skip the issue.
 
 If nothing eligible → report "No issues to work on" and end cycle.
 
@@ -293,7 +293,11 @@ Read the issue body. If unclear → ask a question, label `ai-blocked`, move to 
 Use `code-implementation` skill to implement. On failure (too large, merge conflict, tests failing, build broken):
 
 ```
-gh issue comment <number> --body "**[AI]** <failure description>"
+ATTEMPTS=$(gh issue view <number> --json comments --jq '[.comments[] | select(.body | test("^\\*\\*\\[AI\\]\\*\\* ❌ \\*\\*Attempt failed\\*\\*"))] | length')
+NEXT=$((ATTEMPTS + 1))
+gh issue comment <number> --body "**[AI]** ❌ **Attempt failed** (attempt #$NEXT)
+
+<failure description>"
 gh issue edit <number> --remove-label "ai-in-progress" --add-label "ai-blocked"
 git checkout --detach origin/main
 ```
