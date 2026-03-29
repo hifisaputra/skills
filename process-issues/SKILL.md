@@ -7,96 +7,14 @@ description: Autonomous loop that picks up ai-ready GitHub issues, handles PR fe
 
 Autonomous loop that picks up `ai-ready` issues, implements them via the `code-implementation` skill, and handles feedback on open PRs.
 
-## Comment Authorship
+## Shared Setup
 
-All comments posted by this workflow run under the same GitHub account as the user. To distinguish AI comments from human comments, **every comment posted by AI MUST start with `**[AI]**`**. When reading comments, use this rule:
-- Starts with `**[AI]**` → posted by AI (previous runs)
-- Does NOT start with `**[AI]**` → posted by a human
-
-## Worktree Isolation
-
-This skill MUST run in its own git worktree to avoid conflicts with other parallel Claude instances.
-
-Before starting, check if already in a worktree:
-
-```
-git rev-parse --show-toplevel
-```
-
-If NOT already in a worktree for this skill, create one and switch to it using the `EnterWorktree` tool (if available). If `EnterWorktree` is not available, create one manually and prefix ALL subsequent commands with `cd <worktree-path> &&`:
-
-```
-WORKTREE=$(git rev-parse --show-toplevel)/../$(basename "$(git rev-parse --show-toplevel)")-issues
-git worktree add --detach "$WORKTREE" main 2>/dev/null || true
-```
-
-Using `--detach` is important because `main` is typically already checked out in the primary worktree — `git worktree add "$WORKTREE" main` will silently fail in that case.
-
-Then for every command in this skill, prefix with:
-```
-cd $WORKTREE && <command>
-```
-
-This is necessary because `cd` does not persist between Bash calls.
-
-After creating or entering the worktree, install dependencies if needed:
-
-```
-cd $WORKTREE && [ ! -d "node_modules" ] && (bun install 2>/dev/null || npm install 2>/dev/null || true)
-```
-
-## Loop Cycle
-
-Each cycle runs through three phases in order:
-
-0. **Pre-flight checks** — verify the environment is ready
-1. **Handle feedback** on existing PRs
-2. **Implement** the next available issue
-
----
-
-## Phase 0: Pre-flight Checks
-
-Run these before every cycle. If any fail, stop and report the problem.
-
-```
-# Clean up stale worktrees (from previous crashed runs)
-git worktree prune
-
-# Check gh is authenticated
-gh auth status
-
-# Check working tree is clean (no uncommitted changes)
-git status --porcelain
-```
-
-If `git status --porcelain` produces output, stop: "Working tree is dirty. Commit or stash changes before running."
-
-If `gh auth status` fails, stop: "GitHub CLI is not authenticated. Run `gh auth login`."
-
-Ensure required labels exist (run once per cycle — `gh label create` is a no-op if the label already exists):
-
-```
-for label in ai-ready ai-in-progress ai-done ai-blocked ai-needs-input needs-ai-review ai-changes-requested ai-approved prd; do
-  gh label create "$label" 2>/dev/null || true
-done
-```
-
-Check for the `ai-pause` label — this is the graceful stop signal. The mechanism: **create** the `ai-pause` label to pause, **delete** it (`gh label delete ai-pause -y`) to resume.
-
-```
-gh label list --search "ai-pause" --json name --jq '.[].name' | grep -qx "ai-pause"
-```
-
-The `--search` flag is a fuzzy substring match (it returns labels like `ai-ready`, `ai-done` too), so pipe through `grep -qx` for an exact match. If `grep` matches, the label exists — stop. If `grep` exits non-zero, no exact match — proceed.
-
-If the `ai-pause` label exists, stop: "ai-pause label detected. Stopping gracefully. Delete the label (`gh label delete ai-pause -y`) to resume."
-
-Set up the repo variable for API calls used later:
-
-```
-REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-```
+Read `references/shared.md` for:
+- **Comment authorship** convention (`**[AI]**` prefix)
+- **Worktree isolation** — use suffix `-issues`
+- **Pre-flight checks** (Phase 0) — worktree prune, gh auth, clean tree, label creation, pause check, repo variable
+- **Rate limit handling**
+- **Safety rails**
 
 ---
 
@@ -165,6 +83,8 @@ Read the review comments (reuse `$REPO` from A1):
 gh pr view <number> --comments
 gh api repos/$REPO/pulls/<number>/comments
 ```
+
+**Review-cycle limit:** Before addressing feedback, check if this PR has hit the review-cycle limit (see `references/shared.md` → "Review-Cycle Limit"). If it has been through 3+ AI feedback cycles, escalate instead of continuing. Otherwise proceed with the feedback below.
 
 Categorize each new comment:
 - **Fix**: concrete change requested — use the `code-implementation` skill to make the changes
@@ -247,6 +167,8 @@ Also check for previously blocked issues that now have answers:
 gh issue list --label "ai-blocked" --state open --limit 100 --json number,title,body,labels
 ```
 
+Also check for `ai-needs-input` issues that now have human responses (see `references/shared.md` → "ai-needs-input Transition"). Any issues transitioned to `ai-ready` become eligible in the current cycle.
+
 For each `ai-blocked` issue, determine why it's blocked and whether it's been unblocked:
 
 **Dependency-blocked** (has a `## Blocked by` section with issue references):
@@ -273,8 +195,9 @@ Only treat as eligible if a human has commented since the failure (indicating th
 
 Selection order:
 1. Unblocked `ai-blocked` issues with answered questions (priority first, then oldest)
-2. `ai-ready` issues not labeled `ai-in-progress` (priority first, then oldest)
-3. Skip issues whose "Blocked by" references are still open
+2. Newly-transitioned `ai-needs-input` issues (priority first, then oldest)
+3. `ai-ready` issues not labeled `ai-in-progress` (priority first, then oldest)
+4. Skip issues whose "Blocked by" references are still open
 
 Priority: if an issue has a `priority:high` or `priority:critical` label, pick it before lower-priority or unlabeled issues.
 
