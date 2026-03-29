@@ -14,92 +14,14 @@ This is the last gate before code lands. The two checks are intentionally narrow
 
 If both pass, merge. If either fails, send the PR back with a clear explanation so `process-issues` can fix it.
 
-## Comment Authorship
+## Shared Setup
 
-All comments posted by this workflow run under the same GitHub account as the user. To distinguish AI comments from human comments, **every comment posted by AI MUST start with `**[AI]**`**. When reading comments, use this rule:
-- Starts with `**[AI]**` → posted by AI (previous runs)
-- Does NOT start with `**[AI]**` → posted by a human
-
-## Worktree Isolation
-
-This skill MUST run in its own git worktree to avoid conflicts with other parallel Claude instances.
-
-Before starting, check if already in a worktree:
-
-```
-git rev-parse --show-toplevel
-```
-
-If NOT already in a worktree for this skill, create one and switch to it using the `EnterWorktree` tool (if available). If `EnterWorktree` is not available, create one manually and prefix ALL subsequent commands with `cd <worktree-path> &&`:
-
-```
-WORKTREE=$(git rev-parse --show-toplevel)/../$(basename "$(git rev-parse --show-toplevel)")-merge
-git worktree add --detach "$WORKTREE" main 2>/dev/null || true
-```
-
-Using `--detach` is important because `main` is typically already checked out in the primary worktree — `git worktree add "$WORKTREE" main` will silently fail in that case.
-
-Then for every command in this skill, prefix with:
-```
-cd $WORKTREE && <command>
-```
-
-This is necessary because `cd` does not persist between Bash calls.
-
-## Loop Cycle
-
-Each cycle:
-
-0. **Pre-flight checks** — verify the environment is ready
-1. **Find PRs** labeled `ai-approved`
-2. **Verify** each PR (issue resolution + merge readiness)
-3. **Act** — merge or send back
-4. **Report** what happened
-
----
-
-## Phase 0: Pre-flight Checks
-
-Run these before every cycle. If any fail, stop and report the problem.
-
-```
-# Clean up stale worktrees
-git worktree prune
-
-# Check gh is authenticated
-gh auth status
-
-# Check working tree is clean
-git status --porcelain
-```
-
-If `git status --porcelain` produces output, stop: "Working tree is dirty. Commit or stash changes before running."
-
-If `gh auth status` fails, stop: "GitHub CLI is not authenticated. Run `gh auth login`."
-
-Ensure required labels exist:
-
-```
-for label in ai-ready ai-in-progress ai-done ai-blocked ai-needs-input needs-ai-review ai-changes-requested ai-approved prd; do
-  gh label create "$label" 2>/dev/null || true
-done
-```
-
-Check for the `ai-pause` label — **create** it to pause, **delete** it (`gh label delete ai-pause -y`) to resume:
-
-```
-gh label list --search "ai-pause" --json name --jq '.[].name' | grep -qx "ai-pause"
-```
-
-The `--search` flag is a fuzzy substring match (it returns labels like `ai-ready`, `ai-done` too), so pipe through `grep -qx` for an exact match. If `grep` matches, the label exists — stop. If `grep` exits non-zero, no exact match — proceed.
-
-If the `ai-pause` label exists, stop: "ai-pause label detected. Stopping gracefully. Delete the label (`gh label delete ai-pause -y`) to resume."
-
-Set up the repo variable for API calls used later:
-
-```
-REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-```
+Read `references/shared.md` for:
+- **Comment authorship** convention (`**[AI]**` prefix)
+- **Worktree isolation** — use suffix `-merge`
+- **Pre-flight checks** (Phase 0) — worktree prune, gh auth, clean tree, label creation, pause check, repo variable
+- **Rate limit handling**
+- **Safety rails**
 
 ---
 
@@ -203,6 +125,10 @@ gh pr view <number> --json mergeable,mergeStateStatus
 
 If still unknown after retry, skip this PR for now — it will be picked up in the next cycle.
 
+### 2C. Check for stale approval
+
+Before merging, verify the approval is still valid — no new commits since the last AI review (see `references/shared.md` → "New-Commit Check for Approved PRs"). If stale, relabel to `needs-ai-review` and skip this PR.
+
 ---
 
 ## Phase 3: Act
@@ -223,20 +149,20 @@ gh pr view <number> --json state --jq '.state'
 
 If the state is `MERGED`, the merge succeeded despite the error — proceed normally. If it's still `OPEN`, the merge truly failed — send the PR back with the error message.
 
-The `Closes #N` in the PR body will automatically close the linked issue when the PR is merged.
-
-After merging, check the issue state:
+The `Closes #N` in the PR body automatically closes the linked issue when the PR merges. Verify the issue closed:
 
 ```
 gh issue view <issue-number> --json state --jq '.state'
 ```
 
-If the issue was auto-closed by the merge, no label cleanup is needed. If it's still open for some reason, update it:
+If still open (rare — usually means `Closes #N` syntax was wrong), close it manually:
 
 ```
 gh issue edit <issue-number> --remove-label "ai-done"
 gh issue close <issue-number>
 ```
+
+This is a fallback — normally GitHub handles it.
 
 Update local state to stay current:
 
