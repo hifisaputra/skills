@@ -7,10 +7,13 @@ A set of Claude Code skills that create an automated GitHub-integrated developme
 ```
 You <-> AI (brainstorm) -> GitHub Issues
                               |
-                    +---------+---------+
-                    |                   |
-             [Loop 1: Execute]   [Loop 2: Review]
-             /loop /process-issues  /loop /process-reviews
+                    +---------+---------+---------+
+                    |                   |         |
+             [Loop 1: Execute]   [Loop 2: Review]  [Loop 3: Merge]
+             /process-issues     /process-reviews   /process-pr
+
+             ──── OR use the unified loop ────
+             /supervisor (runs all 3 phases per cycle)
 ```
 
 ### Phase 1: Brainstorm & Plan
@@ -36,6 +39,18 @@ Separate loop that reviews PRs via the `code-review` skill — checks correctnes
 
   ```
   /loop 10m /process-reviews
+  ```
+
+- **process-pr** — Autonomous loop: picks up `ai-approved` PRs, verifies issue resolution and merge readiness, checks for stale approvals, merges or sends back.
+
+  ```
+  /loop 10m /process-pr
+  ```
+
+- **supervisor** — Unified loop that runs all phases (merge → review → feedback → implement) in one session. Alternative to running the three loops separately.
+
+  ```
+  /loop 10m /supervisor
   ```
 
 - **code-implementation** — Structured implementation: understand, plan, TDD (when tests exist), commit, push. Detects project tooling, loads stack-specific references for Next.js and Cloudflare Workers.
@@ -76,6 +91,10 @@ done
 | `priority:high` | High priority issue |
 | `priority:critical` | Critical priority issue |
 
+### Shared References
+
+Loop skills (`process-issues`, `process-reviews`, `process-pr`, `supervisor`) share common setup logic via `references/shared.md`. This includes worktree isolation, pre-flight checks, comment conventions, and safety rails.
+
 ## Label Lifecycle
 
 **Issues:**
@@ -83,12 +102,15 @@ done
 brainstorm creates:
   AFK unblocked  ->  ai-ready
   AFK blocked    ->  ai-blocked (auto-unblocks when blockers close)
-  HITL           ->  ai-needs-input (human comments + relabels to ai-ready)
+  HITL           ->  ai-needs-input (human comments → auto-transitions to ai-ready)
 
 ai-ready  ->  ai-in-progress  ->  ai-done (draft PR opened)
    ^               |
    |               v
    +------- ai-blocked (dependency / question / failure)
+   ^
+   |
+   +------- ai-needs-input (human provides input → auto-detected by loops)
 ```
 
 **PRs:**
