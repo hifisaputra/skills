@@ -7,92 +7,14 @@ description: Autonomous loop that finds PRs needing AI review and delegates to t
 
 Autonomous loop that finds PRs ready for review, delegates each to the `code-review` skill, and updates labels based on the result. A human always makes the final merge decision.
 
-## Comment Authorship
+## Shared Setup
 
-All comments posted by this workflow run under the same GitHub account as the user. To distinguish AI comments from human comments, **every comment posted by AI MUST start with `**[AI]**`**. When reading comments, use this rule:
-- Starts with `**[AI]**` → posted by AI (previous runs)
-- Does NOT start with `**[AI]**` → posted by a human
-
-## Worktree Isolation
-
-This skill MUST run in its own git worktree to avoid conflicts with other parallel Claude instances.
-
-Before starting, check if already in a worktree:
-
-```
-git rev-parse --show-toplevel
-```
-
-If NOT already in a worktree for this skill, create one and switch to it using the `EnterWorktree` tool (if available). If `EnterWorktree` is not available, create one manually and prefix ALL subsequent commands with `cd <worktree-path> &&`:
-
-```
-WORKTREE=$(git rev-parse --show-toplevel)/../$(basename "$(git rev-parse --show-toplevel)")-reviews
-git worktree add --detach "$WORKTREE" main 2>/dev/null || true
-```
-
-Using `--detach` is important because `main` is typically already checked out in the primary worktree — `git worktree add "$WORKTREE" main` will silently fail in that case.
-
-Then for every command in this skill, prefix with:
-```
-cd $WORKTREE && <command>
-```
-
-This is necessary because `cd` does not persist between Bash calls.
-
-## Loop Cycle
-
-Each cycle:
-
-0. **Pre-flight checks** — verify the environment is ready
-1. **Find PRs** needing review
-2. **Review** each PR (delegate to `code-review`)
-3. **Update labels** based on the verdict
-4. **Report** what was reviewed
-
----
-
-## Phase 0: Pre-flight Checks
-
-Run these before every cycle. If any fail, stop and report the problem.
-
-```
-# Clean up stale worktrees
-git worktree prune
-
-# Check gh is authenticated
-gh auth status
-
-# Check working tree is clean
-git status --porcelain
-```
-
-If `git status --porcelain` produces output, stop: "Working tree is dirty. Commit or stash changes before running."
-
-If `gh auth status` fails, stop: "GitHub CLI is not authenticated. Run `gh auth login`."
-
-Ensure required labels exist:
-
-```
-for label in ai-ready ai-in-progress ai-done ai-blocked ai-needs-input needs-ai-review ai-changes-requested ai-approved prd; do
-  gh label create "$label" 2>/dev/null || true
-done
-```
-
-Check for the `ai-pause` label — **create** it to pause, **delete** it (`gh label delete ai-pause -y`) to resume:
-
-```
-gh label list --search "ai-pause" --json name --jq '.[].name' | grep -qx "ai-pause"
-```
-
-The `--search` flag is a fuzzy substring match (it returns labels like `ai-ready`, `ai-done` too), so pipe through `grep -qx` for an exact match. If `grep` matches, the label exists — stop. If `grep` exits non-zero, no exact match — proceed.
-
-If the `ai-pause` label exists, stop: "ai-pause label detected. Stopping gracefully. Delete the label (`gh label delete ai-pause -y`) to resume."
-
-Set up the repo variable for API calls used later:
-
-```
-REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
-```
+Read `references/shared.md` for:
+- **Comment authorship** convention (`**[AI]**` prefix)
+- **Worktree isolation** — use suffix `-reviews`
+- **Pre-flight checks** (Phase 0) — worktree prune, gh auth, clean tree, label creation, pause check, repo variable
+- **Rate limit handling**
+- **Safety rails**
 
 ---
 
@@ -123,12 +45,14 @@ For each non-draft `ai-approved` PR, compare the latest commit date against the 
 gh pr view <number> --json commits --jq '.commits[-1].committedDate'
 
 # Get last AI review comment date — check BOTH issue comments (top-level) and review comments (inline on diff)
-gh pr view <number> --json comments --jq '[.comments[] | select(.body | startswith("**[AI]**")) | .createdAt] | sort | last'
+gh pr view <number> --json comments --jq '[.comments[] | select(.body | startswith("**[AI]**")) | .createdAt] | sort | last // empty'
 ```
 
 Note: use `gh pr view --json comments` (issue-level comments where review summaries appear), NOT `gh api repos/$REPO/pulls/<number>/comments` (which returns inline diff comments only). AI reviews post their summary as a review body which shows up in issue comments.
 
 If the last commit is newer than the last AI review, the PR needs re-review. Remove the stale label:
+
+The `// empty` returns an empty string instead of `null` when no AI comments exist. If the result is empty (no previous AI review), the PR always needs review — relabel to `needs-ai-review`.
 
 ```
 gh pr edit <number> --remove-label "ai-approved" --add-label "needs-ai-review"
@@ -156,7 +80,7 @@ To determine if new commits exist since the last AI review, compare dates:
 
 ```
 # Last AI review comment timestamp
-gh pr view <number> --json comments --jq '[.comments[] | select(.body | startswith("**[AI]**")) | .createdAt] | sort | last'
+gh pr view <number> --json comments --jq '[.comments[] | select(.body | startswith("**[AI]**")) | .createdAt] | sort | last // empty'
 
 # Last commit timestamp
 gh pr view <number> --json commits --jq '.commits[-1].committedDate'
@@ -196,7 +120,8 @@ If it's now a draft, skip it — checkout main and move to the next PR.
 
 Pass to the `code-review` skill:
 - The PR number
-- Whether this is a first review or re-review
+- Whether this is a **first review** or **re-review** (determined in Phase 1)
+- For re-reviews: include a note like "This is a re-review. Previous feedback was posted on <date>. Check if previous findings were addressed." so `code-review` can prioritize checking previous issues.
 
 The `code-review` skill will:
 - Read the diff and surrounding context
