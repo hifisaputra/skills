@@ -1,0 +1,48 @@
+{
+  "expectations": [
+    {
+      "text": "Each issue lists specific files or directories it will modify (not vague references like 'the API layer')",
+      "passed": true,
+      "evidence": "Every issue has a 'Files to modify' section listing specific file paths like '/tmp/widgetin/src/server/api/routes/widget.ts'."
+    },
+    {
+      "text": "Output includes a parallel lanes or concurrency view showing which issues can run simultaneously",
+      "passed": false,
+      "evidence": "No parallel lanes or concurrency view. Only a sequential 'Suggested Implementation Order' (1-13) is provided."
+    },
+    {
+      "text": "No two issues that are simultaneously unblocked (same lane position, no dependency between them) share the same files",
+      "passed": false,
+      "evidence": "11 of 13 issues are simultaneously unblocked (only #10 depends on #9). Issues 3, 4, 5, 8, 11, 12, 13 all independently touch widget.ts + embed-renderer.ts + page.tsx. Running any two of these in parallel would cause merge conflicts on all three shared files."
+    },
+    {
+      "text": "Issues that touch shared files (e.g., widgetConfigSchema, embed-renderer.ts) are chained via dependencies rather than left independent",
+      "passed": false,
+      "evidence": "Only one dependency exists (#10 depends on #9). Issues 3, 4, 5, 8, 11, 12, 13 all touch the same files (widget.ts, embed-renderer.ts, page.tsx) but have no dependencies between them."
+    },
+    {
+      "text": "File paths referenced in the breakdown correspond to actual files in the widgetin codebase",
+      "passed": true,
+      "evidence": "File paths match real files in the repo. Uses absolute paths (/tmp/widgetin/...) rather than relative, but they're correct."
+    },
+    {
+      "text": "Issues are vertical slices (end-to-end), not horizontal layers (e.g., not 'all schema changes' as one issue)",
+      "passed": true,
+      "evidence": "Each issue is a complete vertical slice. E.g., Issue 3 'Reviewer Name Format' touches schema (widget.ts), renderer (embed-renderer.ts), editor UI (page.tsx), DB defaults (widgetin.ts), and tests. Issue 5 'Granular Review Card Style Controls' similarly spans all layers."
+    }
+  ],
+  "summary": {
+    "passed": 3,
+    "failed": 3,
+    "total": 6,
+    "pass_rate": 0.50
+  },
+  "timing": {
+    "total_duration_seconds": 189.2
+  },
+  "claims": [],
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "Baseline performs as expected — good vertical slices with file paths, but zero conflict awareness."
+  }
+}

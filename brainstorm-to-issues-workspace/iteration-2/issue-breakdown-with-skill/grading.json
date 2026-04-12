@@ -1,0 +1,48 @@
+{
+  "expectations": [
+    {
+      "text": "Each issue lists specific files or directories it will modify (not vague references like 'the API layer')",
+      "passed": true,
+      "evidence": "Every issue lists exact file paths: widget.ts, widget.test.ts, embed-renderer.ts, embed-renderer.test.ts, page.tsx with full paths provided in the path key at the bottom. File footprint matrix also shows all files per issue."
+    },
+    {
+      "text": "Output includes a parallel lanes or concurrency view showing which issues can run simultaneously",
+      "passed": true,
+      "evidence": "Includes 'Parallel Lanes View' with 3 lanes (spine + 2 editor lanes) and a 12-wave execution timeline showing exactly which issues run in parallel at each wave."
+    },
+    {
+      "text": "No two issues that are simultaneously unblocked (same lane position, no dependency between them) share the same files",
+      "passed": true,
+      "evidence": "Wave 1: #1 (schema+renderer+tests) vs #4 (editor Style tab) vs #7 (editor preview panel) — no overlap. Wave 4: #12 (editor Review tab only) vs #3 (schema+renderer+tests+editor Style tab) — no overlap. All other waves are single-issue. The output shows extensive iterative verification of each wave with corrections."
+    },
+    {
+      "text": "Issues that touch shared files (e.g., widgetConfigSchema, embed-renderer.ts) are chained via dependencies rather than left independent",
+      "passed": true,
+      "evidence": "All 12 schema+renderer issues form a strict sequential spine: #1 -> #2 -> #5 -> #3 -> #6 -> #9 -> #8 -> #15 -> #14 -> #13 -> #11 -> #10. Only editor-only issues (#4, #7, #12) are independent of the spine."
+    },
+    {
+      "text": "File paths referenced in the breakdown correspond to actual files in the widgetin codebase",
+      "passed": true,
+      "evidence": "All 5 core files map to real paths: server/api/routes/widget.ts, server/api/routes/widget.test.ts, server/services/embed-renderer.ts, server/services/embed-renderer.test.ts, app/(dashboard)/dashboard/widgets/[id]/page.tsx."
+    },
+    {
+      "text": "Issues are vertical slices (end-to-end across schema+renderer+editor+tests), not horizontal layers (e.g., not 'all schema changes' as one issue)",
+      "passed": true,
+      "evidence": "Each issue is a complete feature: e.g., #1 'Reviewer name format + verified badge' touches schema (add nameFormat), renderer (format name in renderReviewCard), and tests. #5 'Photos-first/random sort' touches schema (extend sortBy enum), renderer (implement sort logic), editor (add sort options), and tests. No purely-schema or purely-renderer issues."
+    }
+  ],
+  "summary": {
+    "passed": 6,
+    "failed": 0,
+    "total": 6,
+    "pass_rate": 1.0
+  },
+  "timing": {
+    "total_duration_seconds": 281.4
+  },
+  "claims": [],
+  "eval_feedback": {
+    "suggestions": [],
+    "overall": "All 6 assertions pass. The output correctly maintains vertical slices while using dependency chains to prevent file conflicts. The iterative verification process in the output (catching and fixing conflicts across multiple passes) demonstrates genuine analytical rigor."
+  }
+}

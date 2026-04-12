@@ -1,0 +1,13 @@
+{
+  "skill_name": "brainstorm-to-issues",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I already have this PRD written up for widgetin (the repo is at /tmp/widgetin). Skip the brainstorm/interview steps — just read the PRD from /home/dev/ai-workflow/my-skills/brainstorm-to-issues-workspace/prd.md, explore the codebase, and break it into issues. Don't actually create any GitHub issues — just output the breakdown to a markdown file at the output path.",
+      "expected_output": "A markdown file containing: issue breakdown with file footprints per issue, dependency chains that serialize file-overlapping issues, parallel lanes view showing which issues can run simultaneously, and no two simultaneously-unblocked issues sharing the same files.",
+      "files": [
+        "/home/dev/ai-workflow/my-skills/brainstorm-to-issues-workspace/prd.md"
+      ]
+    }
+  ]
+}

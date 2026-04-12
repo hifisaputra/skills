@@ -1,0 +1,82 @@
+{
+  "metadata": {
+    "skill_name": "brainstorm-to-issues",
+    "timestamp": "2026-03-23T10:30:00Z",
+    "evals_run": ["issue-breakdown"],
+    "runs_per_configuration": 1
+  },
+  "runs": [
+    {
+      "eval_name": "issue-breakdown",
+      "configuration": "with_skill (iteration 2)",
+      "pass_rate": 1.0,
+      "passed": 6,
+      "failed": 0,
+      "total": 6,
+      "time_seconds": 281.4,
+      "tokens": 89024,
+      "expectations": [
+        {"text": "Each issue lists specific files it will modify", "passed": true, "evidence": "Every issue lists exact file paths with full matrix."},
+        {"text": "Output includes parallel lanes/concurrency view", "passed": true, "evidence": "3 lanes + 12-wave execution timeline."},
+        {"text": "No two simultaneously-unblocked issues share files", "passed": true, "evidence": "Verified wave-by-wave; conflicts caught and fixed iteratively."},
+        {"text": "Issues touching shared files are chained via dependencies", "passed": true, "evidence": "12-issue sequential spine for schema+renderer issues."},
+        {"text": "File paths correspond to actual codebase files", "passed": true, "evidence": "All 5 core files verified."},
+        {"text": "Issues are vertical slices, not horizontal layers", "passed": true, "evidence": "Each issue spans schema+renderer+editor+tests for its feature."}
+      ]
+    },
+    {
+      "eval_name": "issue-breakdown",
+      "configuration": "with_skill (iteration 1)",
+      "pass_rate": 0.67,
+      "passed": 4,
+      "failed": 2,
+      "total": 6,
+      "time_seconds": 223.7,
+      "tokens": 76669,
+      "expectations": [
+        {"text": "Each issue lists specific files it will modify", "passed": true, "evidence": "File footprint matrix provided."},
+        {"text": "Output includes parallel lanes/concurrency view", "passed": true, "evidence": "4 lanes + 7-phase timeline."},
+        {"text": "No two simultaneously-unblocked issues share files", "passed": false, "evidence": "Phase 6-7 ran page.tsx-touching issues in parallel."},
+        {"text": "Issues touching shared files are chained via dependencies", "passed": true, "evidence": "Schema, renderer, editor chains established."},
+        {"text": "File paths correspond to actual codebase files", "passed": true, "evidence": "Verified."},
+        {"text": "Issues are vertical slices, not horizontal layers", "passed": false, "evidence": "Split into horizontal layers to avoid conflicts."}
+      ]
+    },
+    {
+      "eval_name": "issue-breakdown",
+      "configuration": "without_skill (baseline)",
+      "pass_rate": 0.50,
+      "passed": 3,
+      "failed": 3,
+      "total": 6,
+      "time_seconds": 189.2,
+      "tokens": 71991,
+      "expectations": [
+        {"text": "Each issue lists specific files it will modify", "passed": true, "evidence": "Files to modify section on each issue."},
+        {"text": "Output includes parallel lanes/concurrency view", "passed": false, "evidence": "Only sequential suggested order."},
+        {"text": "No two simultaneously-unblocked issues share files", "passed": false, "evidence": "11/13 issues unblocked simultaneously sharing same files."},
+        {"text": "Issues touching shared files are chained via dependencies", "passed": false, "evidence": "Only 1 dependency despite massive overlap."},
+        {"text": "File paths correspond to actual codebase files", "passed": true, "evidence": "File paths correct."},
+        {"text": "Issues are vertical slices, not horizontal layers", "passed": true, "evidence": "Each issue spans all layers."}
+      ]
+    }
+  ],
+  "run_summary": {
+    "delta_vs_baseline": {
+      "pass_rate": "+0.50 (1.00 vs 0.50)",
+      "time_seconds": "+92.2",
+      "tokens": "+17033"
+    },
+    "delta_vs_iteration1": {
+      "pass_rate": "+0.33 (1.00 vs 0.67)",
+      "time_seconds": "+57.7",
+      "tokens": "+12355"
+    }
+  },
+  "notes": [
+    "Iteration 2 passes all 6 assertions — both vertical slices AND conflict avoidance.",
+    "The key fix: explicitly telling the model to keep vertical slices and use dependency chains (not horizontal splitting) resolved the tension from iteration 1.",
+    "Tradeoff: more tokens/time due to iterative conflict verification (the model caught and fixed conflicts across 5+ passes within the output).",
+    "The model discovered the fundamental architectural constraint: nearly all features touch the same 5 files, so a 12-issue sequential spine is unavoidable. Only 3 editor-only issues can run in parallel."
+  ]
+}

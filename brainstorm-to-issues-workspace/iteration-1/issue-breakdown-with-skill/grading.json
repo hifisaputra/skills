@@ -1,0 +1,53 @@
+{
+  "expectations": [
+    {
+      "text": "Each issue lists specific files or directories it will modify (not vague references like 'the API layer')",
+      "passed": true,
+      "evidence": "Every issue lists specific file paths like 'src/server/api/routes/widget.ts', 'src/server/services/embed-renderer.ts', 'src/app/(dashboard)/dashboard/widgets/[id]/page.tsx'. A full file footprint matrix is also provided."
+    },
+    {
+      "text": "Output includes a parallel lanes or concurrency view showing which issues can run simultaneously",
+      "passed": true,
+      "evidence": "Includes explicit 'Parallel lanes view' section with 4 lanes and a 7-phase execution timeline showing which issues run in parallel at each phase."
+    },
+    {
+      "text": "No two issues that are simultaneously unblocked (same lane position, no dependency between them) share the same files",
+      "passed": false,
+      "evidence": "Phase 6 runs #8 (page.tsx) and #7 (page.tsx) in parallel. Phase 7 runs #9 (page.tsx) and #10 (page.tsx + embed-renderer.ts) in parallel. The output acknowledges this: 'there is a small risk of merge conflict on the file level' and offers both conservative (serialize) and aggressive approaches, but the lanes view shows the aggressive approach."
+    },
+    {
+      "text": "Issues that touch shared files (e.g., widgetConfigSchema, embed-renderer.ts) are chained via dependencies rather than left independent",
+      "passed": true,
+      "evidence": "#1 and #2 are serialized for widget.ts/embed-renderer.ts/widgetin.ts overlap. #3 depends on #1, #4 depends on #2 for embed-renderer.ts. Editor issues (#5-#11) are chained to avoid page.tsx conflicts. Full dependency graph and conflict resolution rationale provided."
+    },
+    {
+      "text": "File paths referenced in the breakdown correspond to actual files in the widgetin codebase",
+      "passed": true,
+      "evidence": "All paths (src/server/api/routes/widget.ts, src/server/services/embed-renderer.ts, src/app/(dashboard)/dashboard/widgets/[id]/page.tsx, src/server/db/schema/widgetin.ts, etc.) correspond to real files in the repo."
+    },
+    {
+      "text": "Issues are vertical slices (end-to-end), not horizontal layers (e.g., not 'all schema changes' as one issue)",
+      "passed": false,
+      "evidence": "Issues are organized as horizontal layers: #1-#2 are schema-only, #3-#4 are renderer-only, #5-#9 are editor-only. This is deliberate (to minimize file conflicts) but contradicts the vertical slice requirement. E.g., Issue #1 'Add granular card styling to config schema' only touches the schema/interface layers, not the renderer or editor."
+    }
+  ],
+  "summary": {
+    "passed": 4,
+    "failed": 2,
+    "total": 6,
+    "pass_rate": 0.67
+  },
+  "timing": {
+    "total_duration_seconds": 223.7
+  },
+  "claims": [],
+  "eval_feedback": {
+    "suggestions": [
+      {
+        "assertion": "Issues are vertical slices (end-to-end), not horizontal layers",
+        "reason": "There is a fundamental tension between vertical slices and conflict avoidance. Vertical slices guarantee each issue touches schema+renderer+editor (3 shared files), making conflict-free parallelism nearly impossible. The skill should address this tension explicitly — perhaps by keeping vertical slices but using dependencies to chain them, rather than splitting into horizontal layers."
+      }
+    ],
+    "overall": "The with-skill output is dramatically better at conflict analysis but traded vertical slices for horizontal layers to achieve it. The skill instructions need to reconcile this tension."
+  }
+}

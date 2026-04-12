@@ -1,0 +1,57 @@
+{
+  "metadata": {
+    "skill_name": "brainstorm-to-issues",
+    "timestamp": "2026-03-23T10:17:00Z",
+    "evals_run": ["issue-breakdown"],
+    "runs_per_configuration": 1
+  },
+  "runs": [
+    {
+      "eval_name": "issue-breakdown",
+      "configuration": "with_skill",
+      "pass_rate": 0.67,
+      "passed": 4,
+      "failed": 2,
+      "total": 6,
+      "time_seconds": 223.7,
+      "tokens": 76669,
+      "expectations": [
+        {"text": "Each issue lists specific files or directories it will modify", "passed": true, "evidence": "Every issue lists specific file paths. Full file footprint matrix provided."},
+        {"text": "Output includes a parallel lanes or concurrency view", "passed": true, "evidence": "Explicit 'Parallel lanes view' with 4 lanes and 7-phase execution timeline."},
+        {"text": "No two simultaneously-unblocked issues share files", "passed": false, "evidence": "Phase 6-7 runs page.tsx-touching issues in parallel (acknowledged as risk)."},
+        {"text": "Issues touching shared files are chained via dependencies", "passed": true, "evidence": "Schema, renderer, and editor issues all chained via dependencies."},
+        {"text": "File paths correspond to actual files in the codebase", "passed": true, "evidence": "All paths verified against repo structure."},
+        {"text": "Issues are vertical slices, not horizontal layers", "passed": false, "evidence": "Issues split into horizontal layers (schema-only, renderer-only, editor-only) to minimize conflicts."}
+      ]
+    },
+    {
+      "eval_name": "issue-breakdown",
+      "configuration": "without_skill",
+      "pass_rate": 0.50,
+      "passed": 3,
+      "failed": 3,
+      "total": 6,
+      "time_seconds": 189.2,
+      "tokens": 71991,
+      "expectations": [
+        {"text": "Each issue lists specific files or directories it will modify", "passed": true, "evidence": "Every issue has 'Files to modify' section with specific paths."},
+        {"text": "Output includes a parallel lanes or concurrency view", "passed": false, "evidence": "Only a sequential 'Suggested Implementation Order' provided."},
+        {"text": "No two simultaneously-unblocked issues share files", "passed": false, "evidence": "11/13 issues unblocked simultaneously, most sharing widget.ts + embed-renderer.ts + page.tsx."},
+        {"text": "Issues touching shared files are chained via dependencies", "passed": false, "evidence": "Only 1 dependency (#10→#9) despite massive file overlap across issues."},
+        {"text": "File paths correspond to actual files in the codebase", "passed": true, "evidence": "File paths match real files in repo."},
+        {"text": "Issues are vertical slices, not horizontal layers", "passed": true, "evidence": "Each issue spans schema + renderer + editor + tests."}
+      ]
+    }
+  ],
+  "run_summary": {
+    "delta": {
+      "pass_rate": "+0.17",
+      "time_seconds": "+34.5",
+      "tokens": "+4678"
+    }
+  },
+  "notes": [
+    "Key tension discovered: vertical slices and conflict avoidance are at odds. Vertical slices force each issue to touch the same 3-4 files, making conflict-free parallelism impossible. The with-skill version traded vertical slices for horizontal layers to achieve conflict avoidance.",
+    "The skill needs to reconcile this — possibly by keeping vertical slices but using dependency chains to serialize issues that share files, rather than splitting into horizontal layers."
+  ]
+}

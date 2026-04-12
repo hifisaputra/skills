@@ -1,0 +1,37 @@
+{
+  "eval_id": 1,
+  "eval_name": "issue-breakdown-with-skill",
+  "prompt": "I already have this PRD written up for widgetin (the repo is at /tmp/widgetin). Skip the brainstorm/interview steps — just read the PRD, explore the codebase, and break it into issues. Don't actually create any GitHub issues — just output the breakdown to a markdown file.",
+  "assertions": [
+    {
+      "id": "file-footprints",
+      "text": "Each issue lists specific files or directories it will modify (not vague references like 'the API layer')",
+      "type": "manual"
+    },
+    {
+      "id": "parallel-lanes",
+      "text": "Output includes a parallel lanes or concurrency view showing which issues can run simultaneously",
+      "type": "manual"
+    },
+    {
+      "id": "no-parallel-overlap",
+      "text": "No two issues that are simultaneously unblocked (same lane position, no dependency between them) share the same files",
+      "type": "manual"
+    },
+    {
+      "id": "dependency-serialization",
+      "text": "Issues that touch shared files (e.g., widgetConfigSchema, embed-renderer.ts) are chained via dependencies rather than left independent",
+      "type": "manual"
+    },
+    {
+      "id": "real-file-paths",
+      "text": "File paths referenced in the breakdown correspond to actual files in the widgetin codebase",
+      "type": "manual"
+    },
+    {
+      "id": "vertical-slices",
+      "text": "Issues are vertical slices (end-to-end), not horizontal layers (e.g., not 'all schema changes' as one issue)",
+      "type": "manual"
+    }
+  ]
+}
